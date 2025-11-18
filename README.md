@@ -1,26 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Frontend B3 Sahabat IoT
 
-## Getting Started
+Proyek ini adalah dashboard web untuk memantau dan mengelola perangkat IoT. Fokusnya: lihat status perangkat secara realtime, kirim perintah, dan cek log aktivitas lewat antarmuka yang simpel.
 
-First, run the development server:
+## Isi Utama
+- **Monitoring**: Status online/offline ditampilkan realtime lewat websocket.
+- **Kontrol**: Kirim perintah ke perangkat (ON/OFF) sesuai izin.
+- **Log**: Riwayat perintah, status, dan koneksi per perangkat.
+- **Manajemen**: Tambah/edit perangkat, kelola grup, dan penugasan perangkat ke grup.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Prasyarat
+- Node.js LTS (disarankan v18+).
+- Paket manajer: `npm`, `yarn`, atau `pnpm`.
+- Endpoint API backend sudah berjalan dan dapat diakses (lihat `NEXT_PUBLIC_API_URL`).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Variabel Lingkungan
+Buat file `.env.local` dengan nilai berikut:
+- `NEXT_PUBLIC_API_URL` — URL backend (contoh: `http://localhost:8000`).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Cara Menjalankan
+1) **Instal dependensi**
+```bash
+npm install
+# atau
+yarn
+# atau
+pnpm install
+```
 
-## Learn More
+2) **Jalankan mode pengembangan**
+```bash
+npm run dev
+```
+Buka `http://localhost:3000` di browser.
 
-To learn more about Next.js, take a look at the following resources:
+3) **Build untuk produksi**
+```bash
+npm run build
+npm run start
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Alur Realtime Singkat
+- Frontend berlangganan websocket ke backend.
+- Backend mendorong event: status perangkat, koneksi (online/offline), dan log.
+- UI langsung memperbarui ikon status (🟢/🔴) dan menonaktifkan kontrol saat perangkat offline, kecuali tombol "View Logs".
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Strukur Folder Ringkas
+- `app/` — Halaman utama Next.js (App Router).
+- `components/` — Komponen UI yang dapat digunakan ulang.
+- `lib/` — Helper/API client.
+- `public/` — Aset statis.
 
-## Deploy on Vercel
+## Tips Penggunaan
+- Pastikan backend aktif sebelum membuka dashboard agar status perangkat terisi.
+- Jika status tidak muncul, cek koneksi websocket dan nilai `NEXT_PUBLIC_API_URL`.
+- Gunakan tombol "View Logs" untuk melihat riwayat terakhir ketika perangkat offline.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Lisensi
+Internal project — gunakan sesuai izin pemilik repositori.
