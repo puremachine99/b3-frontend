@@ -13,38 +13,55 @@
           "name": "Register (Admin)",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{baseUrl}}/auth/register",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"username\": \"admin\",\n  \"email\": \"admin@example.com\",\n  \"password\": \"admin123\",\n  \"role\": \"ADMIN\"\n}"
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
             }
-          }
-        },
-        {
-          "name": "Login (Admin)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{baseUrl}}/auth/login",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"admin123\"\n}"
-            }
+          ],
+          "url": "{{baseUrl}}/auth/register",
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"username\": \"admin\",\n  \"email\": \"puremachine99@gmail.com\",\n  \"password\": \"nopel123\",\n  \"role\": \"ADMIN\"\n}"
           }
         }
-      ]
-    },
+      },
+      {
+        "name": "Login (Admin - puremachine99)",
+        "request": {
+          "method": "POST",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "url": "{{baseUrl}}/auth/login",
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"email\": \"puremachine99@gmail.com\",\n  \"password\": \"nopel123\"\n}"
+          }
+        }
+      },
+      {
+        "name": "Login (Admin - mynameisnoz)",
+        "request": {
+          "method": "POST",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "url": "{{baseUrl}}/auth/login",
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"email\": \"mynameisnoz@gmail.com\",\n  \"password\": \"nozforever\"\n}"
+          }
+        }
+      }
+    ]
+  },
     {
       "name": "Users",
       "item": [
@@ -148,6 +165,32 @@
           }
         },
         {
+          "name": "Get Device By Id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/devices/{{deviceId}}"
+          }
+        },
+        {
+          "name": "Get Device Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/devices/{{deviceId}}/status"
+          }
+        },
+        {
           "name": "Create Device",
           "request": {
             "method": "POST",
@@ -164,8 +207,42 @@
             "url": "{{baseUrl}}/devices",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"macAddress\": \"A47221B7B3F8\",\n  \"name\": \"Washer Unit 1\",\n  \"description\": \"Laundry Machine - ESP32\",\n  \"location\": \"Main Branch - Room A\",\n  \"status\": \"OFFLINE\"\n}"
+              "raw": "{\n  \"serialNumber\": \"A47221B7B3F8\",\n  \"name\": \"Washer Unit 1\",\n  \"description\": \"Laundry Machine\",\n  \"location\": \"Main Branch\",\n  \"status\": \"OFFLINE\"\n}"
             }
+          }
+        },
+        {
+          "name": "Update Device",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/devices/{{deviceId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Name\",\n  \"location\": \"New Location\",\n  \"status\": \"ONLINE\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Device",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/devices/{{deviceId}}"
           }
         },
         {
@@ -182,10 +259,10 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{baseUrl}}/devices/A47221B7B3F8/cmd",
+            "url": "{{baseUrl}}/devices/{{deviceSerial}}/cmd",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"payload\": {\"action\": \"start\"}\n}"
+              "raw": "{\n  \"payload\": {\n    \"command\": \"START\",\n    \"params\": {\n      \"speed\": 1\n    }\n  }\n}"
             }
           }
         }
@@ -211,8 +288,68 @@
             "url": "{{baseUrl}}/groups",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Laundry Cluster A\",\n  \"description\": \"Main branch washing machines\"\n}"
+              "raw": "{\n  \"name\": \"Main Branch\",\n  \"description\": \"Group for main branch\",\n  \"metadata\": {\n    \"region\": \"west\"\n  }\n}"
             }
+          }
+        },
+        {
+          "name": "List Groups",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/groups"
+          }
+        },
+        {
+          "name": "Get Group By Id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/groups/{{groupId}}"
+          }
+        },
+        {
+          "name": "Update Group",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/groups/{{groupId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated desc\",\n  \"metadata\": {\n    \"priority\": \"high\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Group",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/groups/{{groupId}}"
           }
         },
         {
@@ -229,7 +366,20 @@
           }
         },
         {
-          "name": "List Groups",
+          "name": "Remove Device from Group",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/groups/{{groupId}}/devices/{{deviceId}}"
+          }
+        },
+        {
+          "name": "List Devices in Group",
           "request": {
             "method": "GET",
             "header": [
@@ -238,7 +388,7 @@
                 "value": "Bearer {{token}}"
               }
             ],
-            "url": "{{baseUrl}}/groups"
+            "url": "{{baseUrl}}/groups/{{groupId}}/devices"
           }
         }
       ]
@@ -304,7 +454,7 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://localhost:3000"
+      "value": "http://localhost:8000"
     },
     {
       "key": "token",
@@ -312,7 +462,7 @@
     },
     {
       "key": "deviceId",
-      "value": "A47221B7B3F8"
+      "value": ""
     },
     {
       "key": "groupId",
@@ -321,6 +471,10 @@
     {
       "key": "userId",
       "value": ""
+    },
+    {
+      "key": "deviceSerial",
+      "value": "A47221B7B3F8"
     }
   ]
 }

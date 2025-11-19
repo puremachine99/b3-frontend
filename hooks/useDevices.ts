@@ -1,0 +1,377 @@
+// src/hooks/useDevices.ts
+
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { api } from "@/lib/api";
+import { useSocket } from "@/hooks/useSocket";
+
+import {
+  mapApiDeviceToDevice,
+  mapApiGroupToGroup,
+  mapApiLog,
+  parseApiError,
+  normalizeStatus,
+  extractRelayState,
+  mergeAndSortLogs,
+} from "@/utils/device";
+
+import type {
+  Device,
+  NewDevicePayload,
+  UpdateDevicePayload,
+} from "@/types/device";
+import type { DeviceGroup } from "@/types/group";
+import type { DeviceLog } from "@/types/logs";
+export const useDevices = () => {
+  // ---------------------------
+  // STATE
+  // ---------------------------
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [groups, setGroups] = useState<DeviceGroup[]>([]);
+  const [logs, setLogs] = useState<Record<string, DeviceLog[]>>({});
+  const [loadingDevices, setLoadingDevices] = useState(true);
+  const [loadingGroups, setLoadingGroups] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // power state ON/OFF
+  const [powerMap, setPowerMap] = useState<Record<string, boolean>>({});
+  // online / offline
+  const [connectionMap, setConnectionMap] = useState<
+    Record<string, "online" | "offline">
+  >({});
+
+  // ---------------------------
+  // HELPERS
+  // ---------------------------
+
+  const updateConnectionState = (
+    deviceId: string,
+    status: string | undefined
+  ) => {
+    if (!status) return;
+
+    const v = status.toLowerCase();
+    const online = v === "online" || v === "on" || v.includes("connected");
+
+    const offline =
+      v === "offline" || v === "off" || v.includes("disconnected");
+
+    if (!online && !offline) return;
+
+    setConnectionMap((prev) => ({
+      ...prev,
+      [deviceId]: online ? "online" : "offline",
+    }));
+  };
+
+  const appendLogs = useCallback(
+    (deviceId: string, entries: DeviceLog | DeviceLog[]) => {
+      const incoming = Array.isArray(entries) ? entries : [entries];
+      setLogs((prev) => {
+        const merged = mergeAndSortLogs(prev[deviceId] ?? [], incoming);
+        return {
+          ...prev,
+          [deviceId]: merged.slice(-50),
+        };
+      });
+    },
+    []
+  );
+
+  const getDevicesSnapshot = useCallback(() => devices, [devices]);
+
+  const handleSocketConnection = useCallback(
+    (deviceId: string, status: "online" | "offline") => {
+      setConnectionMap((prev) => ({
+        ...prev,
+        [deviceId]: status,
+      }));
+    },
+    []
+  );
+
+  const handleSocketPower = useCallback((deviceId: string, powered: boolean) => {
+    setPowerMap((prev) => ({
+      ...prev,
+      [deviceId]: powered,
+    }));
+  }, []);
+
+  const handleSocketLog = useCallback(
+    (deviceId: string, log: DeviceLog) => {
+      appendLogs(deviceId, log);
+    },
+    [appendLogs]
+  );
+
+  useSocket({
+    getDevices: getDevicesSnapshot,
+    onLog: handleSocketLog,
+    onConnectionUpdate: handleSocketConnection,
+    onPowerUpdate: handleSocketPower,
+  });
+
+  // ---------------------------
+  // LOAD DEVICES
+  // ---------------------------
+
+  const loadDevices = useCallback(async () => {
+    try {
+      setLoadingDevices(true);
+      setError(null);
+
+      const res = await api.get("/devices");
+      const rawDevices = Array.isArray(res.data)
+        ? res.data
+        : res.data?.data ?? [];
+
+      const mapped = rawDevices.map(mapApiDeviceToDevice);
+      setDevices(mapped);
+
+      // Initial power & connection
+      setPowerMap(
+        Object.fromEntries(mapped.map((d) => [d.id, d.status === "online"]))
+      );
+
+      setConnectionMap(
+        Object.fromEntries(
+          mapped.map((d) => [
+            d.serial || d.id,
+            d.status === "online" ? "online" : "offline",
+          ])
+        )
+      );
+
+      await refreshDeviceStatuses(mapped);
+      await preloadLogs(mapped);
+    } catch (err) {
+      setError(parseApiError(err));
+    } finally {
+      setLoadingDevices(false);
+    }
+  }, []);
+
+  // ---------------------------
+  // LOAD GROUPS
+  // ---------------------------
+
+  const loadGroups = useCallback(async () => {
+    try {
+      setLoadingGroups(true);
+
+      const res = await api.get("/groups");
+      const raw = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+
+      setGroups(raw.map(mapApiGroupToGroup));
+    } catch (err) {
+      console.error("Failed to load groups:", err);
+    } finally {
+      setLoadingGroups(false);
+    }
+  }, []);
+
+  // ---------------------------------
+  // PRELOAD LOGS (API)
+  // ---------------------------------
+
+  const preloadLogs = async (deviceList: Device[]) => {
+    try {
+      const results = await Promise.allSettled(
+        deviceList.map(async (dev) => {
+          const key = dev.serial || dev.id;
+          if (!key) return null;
+
+          const res = await api.get(`/device-logs/${key}`);
+          const rawLogs = Array.isArray(res.data)
+            ? res.data
+            : res.data?.data ?? [];
+
+          const mappedLogs = rawLogs.map((item: any, idx: number) =>
+            mapApiLog(dev, item, idx)
+          );
+
+          // power state via relay
+          const relay = mappedLogs
+            .map((l) => extractRelayState(l.payload))
+            .find((v) => v !== null);
+
+          if (relay) {
+            setPowerMap((prev) => ({
+              ...prev,
+              [dev.id]: relay === "ON",
+            }));
+          }
+
+          return {
+            deviceId: key,
+            logs: mergeAndSortLogs(mappedLogs).slice(-50),
+          };
+        })
+      );
+
+      const merged: Record<string, DeviceLog[]> = {};
+      results.forEach((res) => {
+        if (res.status === "fulfilled" && res.value) {
+          merged[res.value.deviceId] = res.value.logs;
+        }
+      });
+
+      setLogs((prev) => ({ ...prev, ...merged }));
+    } catch (err) {
+      console.error("Failed preload logs:", err);
+    }
+  };
+
+  // ---------------------------------
+  // CRUD & ACTIONS
+  // ---------------------------------
+
+  const createDevice = async (payload: NewDevicePayload) => {
+    try {
+      await api.post("/devices", {
+        macAddress: payload.serialNumber,
+        serialNumber: payload.serialNumber,
+        name: payload.name,
+        description: payload.description,
+        location: payload.location,
+        status: "OFFLINE",
+        latitude: payload.latitude,
+        longitude: payload.longitude,
+      });
+      await loadDevices();
+    } catch (err) {
+      throw new Error(parseApiError(err));
+    }
+  };
+
+  const updateDevice = async (payload: UpdateDevicePayload) => {
+    try {
+      await api.patch(`/devices/${payload.id}`, {
+        macAddress: payload.serialNumber,
+        serialNumber: payload.serialNumber,
+        name: payload.name,
+        description: payload.description,
+        location: payload.location,
+        latitude: payload.latitude,
+        longitude: payload.longitude,
+      });
+      await loadDevices();
+    } catch (err) {
+      throw new Error(parseApiError(err));
+    }
+  };
+
+  const deleteDevice = async (device: Device) => {
+    try {
+      const id = device.serial || device.id;
+      await api.delete(`/devices/${id}`);
+      await loadDevices();
+    } catch (err) {
+      throw new Error(parseApiError(err));
+    }
+  };
+
+  const assignDeviceToGroup = async (deviceId: string, groupId: string) => {
+    try {
+      await api.post(`/groups/${groupId}/devices/${deviceId}`);
+      await Promise.all([loadDevices(), loadGroups()]);
+    } catch (err) {
+      throw new Error(parseApiError(err));
+    }
+  };
+
+  const togglePower = async (device: Device, value: boolean) => {
+    const command = value ? "ON" : "OFF";
+    const id = device.serial || device.id;
+
+    // optimistic update
+    setPowerMap((prev) => ({ ...prev, [device.id]: value }));
+
+    try {
+      await api.post(`/devices/${id}/cmd`, {
+        payload: { command, params: { speed: 1 } },
+      });
+    } catch (err) {
+      // revert
+      setPowerMap((prev) => ({ ...prev, [device.id]: !value }));
+      throw new Error(parseApiError(err));
+    }
+  };
+
+  // ---------------------------------
+  // REFRESH STATUS (API)
+  // ---------------------------------
+
+  const refreshDeviceStatuses = useCallback(async (deviceList: Device[]) => {
+    try {
+      const results = await Promise.allSettled(
+        deviceList.map(async (dev) => {
+          const id = dev.serial || dev.id;
+          const res = await api.get(`/devices/${id}/status`);
+          const data = res.data;
+
+          const status = normalizeStatus(data?.status);
+          const lastSeen = data?.lastSeenAt
+            ? new Date(data.lastSeenAt).toLocaleString()
+            : undefined;
+
+          return { id, status, lastSeen };
+        })
+      );
+
+      results.forEach((res) => {
+        if (res.status !== "fulfilled" || !res.value) return;
+        const { id, status, lastSeen } = res.value;
+
+        updateConnectionState(id, status);
+
+        setDevices((prev) =>
+          prev.map((d) =>
+            d.serial === id || d.id === id
+              ? { ...d, status: status, lastSeen: lastSeen ?? d.lastSeen }
+              : d
+          )
+        );
+      });
+    } catch (err) {
+      console.error("Failed refresh:", err);
+    }
+  }, []);
+
+  // ---------------------------------
+  // INIT LOAD
+  // ---------------------------------
+
+  useEffect(() => {
+    loadDevices();
+    loadGroups();
+  }, [loadDevices, loadGroups]);
+
+  // ---------------------------------
+  // PUBLIC API RETURN
+  // ---------------------------------
+
+  return {
+    devices,
+    groups,
+    logs,
+    powerMap,
+    connectionMap,
+
+    loadingDevices,
+    loadingGroups,
+    error,
+
+    // actions
+    createDevice,
+    updateDevice,
+    deleteDevice,
+    assignDeviceToGroup,
+    togglePower,
+
+    refreshDeviceStatuses,
+    reloadDevices: loadDevices,
+    reloadGroups: loadGroups,
+  };
+};
