@@ -39,10 +39,10 @@ export const DeviceToolbar = ({
 
         {/* ACTION BUTTONS */}
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={onOpenTerminal}>
+          {/* <Button variant="outline" onClick={onOpenTerminal}>
             <IconTerminal2 className="size-4" />
             Terminal Mode
-          </Button>
+          </Button> */}
 
           <Button variant="outline" onClick={onOpenAdd}>
             <IconPlugConnected className="size-4" />

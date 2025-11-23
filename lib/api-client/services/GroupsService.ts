@@ -93,7 +93,7 @@ export class GroupsService {
     /**
      * Attach a device to a group
      * @param id Group identifier
-     * @param deviceId Device identifier to attach
+     * @param deviceId Device ID (use database id, not serial)
      * @returns any Result of the association
      * @throws ApiError
      */
@@ -113,7 +113,7 @@ export class GroupsService {
     /**
      * Detach a device from a group
      * @param id Group identifier
-     * @param deviceId Device identifier to remove
+     * @param deviceId Device ID (use database id, not serial)
      * @returns any Result of the disassociation
      * @throws ApiError
      */

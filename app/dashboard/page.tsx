@@ -271,7 +271,7 @@ export default function Page() {
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <StatBox
                   label="Total Devices"
-                  value={devices.length}
+                  value={filteredDevices.length}
                   loading={loading}
                 />
                 <StatBox

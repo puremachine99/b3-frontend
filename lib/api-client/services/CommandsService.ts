@@ -9,7 +9,7 @@ import { request as __request } from '../core/request';
 export class CommandsService {
     /**
      * Broadcast a command payload to a single device channel
-     * @param id Device identifier
+     * @param id Device ID (not serial number)
      * @param requestBody
      * @returns any Command published to the device-specific topic
      * @throws ApiError

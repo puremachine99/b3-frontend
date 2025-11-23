@@ -206,7 +206,7 @@ export const mapApiDeviceToDevice = (api: any): Device => {
     location: api?.location || "-",
     firmware: "-",
     description: api?.description,
-    groupId: api?.groupId || api?.group?.id || "all",
+    groupId: api?.groupId || api?.group?.id || undefined,
     latitude: normalizeCoordinateValue(api?.latitude),
     longitude: normalizeCoordinateValue(api?.longitude),
   };
@@ -214,18 +214,23 @@ export const mapApiDeviceToDevice = (api: any): Device => {
 
 export const mapApiGroupToGroup = (api: any): DeviceGroup => {
   const id = api?.id || crypto.randomUUID();
+  const devices = Array.isArray(api?.devices)
+    ? api.devices.map((entry: any) => {
+        const rawDevice = entry?.device ?? entry;
+        const mapped = mapApiDeviceToDevice(rawDevice);
+        return {
+          ...mapped,
+          groupId: id,
+        };
+      })
+    : [];
 
   return {
     id,
     name: api?.name || "Unnamed Group",
     description: api?.description || "",
     site: api?.site || "",
-    devices: Array.isArray(api.devices)
-      ? api.devices.map((d: any) => ({
-          ...mapApiDeviceToDevice(d),
-          groupId: id,
-        }))
-      : [],
+    devices,
   };
 };
 

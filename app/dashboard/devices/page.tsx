@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
@@ -28,7 +28,8 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/ca
 
 import { useDevices } from "@/hooks/useDevices";
 import { useDeviceDialogs } from "@/hooks/useDeviceDialogs";
-import { isDeviceDisconnected } from "@/utils/device";
+import { isDeviceDisconnected, parseApiError } from "@/utils/device";
+import { toast } from "sonner";
 
 import type { Device } from "@/types/device";
 import type { DeviceGroup } from "@/types/group";
@@ -77,6 +78,8 @@ export default function DevicesPage() {
   const [assignGroupId, setAssignGroupId] = useState("");
   const [assignSubmitting, setAssignSubmitting] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [groupToggleState, setGroupToggleState] = useState<Record<string, boolean>>({});
+  const [groupToggleLoading, setGroupToggleLoading] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!assignDevice) {
@@ -111,9 +114,23 @@ export default function DevicesPage() {
       })),
     }));
 
+    const getDeviceKey = (device: Device) =>
+      device.id || device.serial || device.serialNumber || "";
+
+    const groupedDeviceIds = new Set<string>();
+    apiGroups.forEach((group) => {
+      (group.devices ?? []).forEach((device) => {
+        const key = getDeviceKey(device);
+        if (key) groupedDeviceIds.add(key);
+      });
+    });
+
     const fallbackMap = new Map<string, Device[]>();
     visibleDevices.forEach((device) => {
-      if (device.groupId && device.groupId !== "all") {
+      const key = getDeviceKey(device);
+      if (!key) return;
+      if (groupedDeviceIds.has(key)) return;
+      if (device.groupId) {
         const list = fallbackMap.get(device.groupId) ?? [];
         fallbackMap.set(device.groupId, [...list, device]);
       }
@@ -151,7 +168,11 @@ export default function DevicesPage() {
         name: "All Devices",
         description: "Data langsung dari API /devices",
         site: "",
-        devices: visibleDevices,
+        devices: visibleDevices.filter((device) => {
+          const key = getDeviceKey(device);
+          if (!key) return !device.groupId;
+          return !device.groupId && !groupedDeviceIds.has(key);
+        }),
       },
       ...merged,
     ];
@@ -208,7 +229,7 @@ export default function DevicesPage() {
     if (!assignDevice || !assignGroupId) return;
     try {
       setAssignSubmitting(true);
-      await assignDeviceToGroup(assignDevice.id, assignGroupId);
+      await assignDeviceToGroup(assignGroupId, assignDevice.id);
       setAssignDevice(null);
     } catch (err) {
       console.error("Failed to assign device", err);
@@ -216,6 +237,40 @@ export default function DevicesPage() {
       setAssignSubmitting(false);
     }
   };
+
+  const handleGroupToggle = useCallback(
+    async (group: DeviceGroup, value: boolean) => {
+      if (group.id === "all") return;
+      if (!group.devices.length) {
+        toast.error("Group has no devices", {
+          description: "Assign devices to this group before sending commands.",
+        });
+        return;
+      }
+
+      setGroupToggleLoading((prev) => ({ ...prev, [group.id]: true }));
+      setGroupToggleState((prev) => ({ ...prev, [group.id]: value }));
+
+      try {
+        await Promise.all(
+          group.devices.map((device) => togglePower(device, value))
+        );
+        toast(value ? "Power ON command sent" : "Power OFF command sent", {
+          description: `${group.devices.length} device${
+            group.devices.length === 1 ? "" : "s"
+          } targeted`,
+        });
+      } catch (err) {
+        setGroupToggleState((prev) => ({ ...prev, [group.id]: !value }));
+        toast.error("Failed to send group command", {
+          description: parseApiError(err),
+        });
+      } finally {
+        setGroupToggleLoading((prev) => ({ ...prev, [group.id]: false }));
+      }
+    },
+    [togglePower]
+  );
 
   return (
     <SidebarProvider style={SHELL_STYLE}>
@@ -261,10 +316,13 @@ export default function DevicesPage() {
                     connectionMap={connectionMap}
                     logs={logs}
                     onTogglePower={togglePower}
+                    onToggleGroup={handleGroupToggle}
                     onDelete={handleOpenDelete}
                     onViewLogs={setLogDevice}
                     onEdit={setEditDevice}
                     onAssign={handleOpenAssign}
+                    groupToggleState={groupToggleState}
+                    groupToggleLoading={groupToggleLoading}
                   />
                 </TabsContent>
 
@@ -275,10 +333,13 @@ export default function DevicesPage() {
                     connectionMap={connectionMap}
                     logs={logs}
                     onTogglePower={togglePower}
+                    onToggleGroup={handleGroupToggle}
                     onDelete={handleOpenDelete}
                     onViewLogs={setLogDevice}
                     onEdit={setEditDevice}
                     onAssign={handleOpenAssign}
+                    groupToggleState={groupToggleState}
+                    groupToggleLoading={groupToggleLoading}
                   />
                 </TabsContent>
 
@@ -289,10 +350,13 @@ export default function DevicesPage() {
                     connectionMap={connectionMap}
                     logs={logs}
                     onTogglePower={togglePower}
+                    onToggleGroup={handleGroupToggle}
                     onDelete={handleOpenDelete}
                     onViewLogs={setLogDevice}
                     onEdit={setEditDevice}
                     onAssign={handleOpenAssign}
+                    groupToggleState={groupToggleState}
+                    groupToggleLoading={groupToggleLoading}
                   />
                 </TabsContent>
               </Tabs>

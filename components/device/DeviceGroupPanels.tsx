@@ -14,12 +14,15 @@ interface Props {
   connectionMap: Record<string, "online" | "offline">;
 
   onTogglePower: (device: Device, value: boolean) => void;
+  onToggleGroup: (group: DeviceGroup, value: boolean) => void;
   onDelete: (device: Device) => void;
   onViewLogs: (device: Device) => void;
   onEdit: (device: Device) => void;
   onAssign: (device: Device) => void;
 
   logs: Record<string, any[]>;
+  groupToggleState: Record<string, boolean>;
+  groupToggleLoading: Record<string, boolean>;
 }
 
 export const DeviceGroupPanels = ({
@@ -27,30 +30,62 @@ export const DeviceGroupPanels = ({
   powerMap,
   connectionMap,
   onTogglePower,
+  onToggleGroup,
   onDelete,
   onViewLogs,
   onEdit,
   onAssign,
   logs,
+  groupToggleState,
+  groupToggleLoading,
 }: Props) => {
   return (
     <div className="grid gap-4 xl:grid-cols-10">
-      {groups.map((group) => (
-        <Card key={group.id} className="xl:col-span-5">
-          <CardHeader className="space-y-1">
-            <CardTitle className="flex items-center justify-between text-lg">
-              {group.name}
-              <Badge variant="outline">{group.devices.length} devices</Badge>
-            </CardTitle>
+      {groups.map((group) => {
+        const isAllGroup = group.id === "all";
+        const fallbackAllOn =
+          group.devices.length > 0 &&
+          group.devices.every((device) => powerMap[device.id]);
+        const groupChecked =
+          groupToggleState[group.id] ?? fallbackAllOn;
+        const disableGroupSwitch =
+          isAllGroup ||
+          group.devices.length === 0 ||
+          groupToggleLoading[group.id];
 
-            {group.description ? (
-              <CardDescription>{group.description}</CardDescription>
-            ) : null}
+        return (
+          <Card key={group.id} className="xl:col-span-5">
+            <CardHeader className="space-y-1">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <CardTitle className="text-lg">{group.name}</CardTitle>
+                  <Badge variant="outline">{group.devices.length} devices</Badge>
+                </div>
+                {!isAllGroup ? (
+                  <div className="flex flex-col items-end gap-1">
+                    <Switch
+                      checked={groupChecked}
+                      disabled={disableGroupSwitch}
+                      onCheckedChange={(value) => onToggleGroup(group, value)}
+                      aria-label={`Toggle group ${group.name}`}
+                    />
+                    {groupToggleLoading[group.id] ? (
+                      <p className="text-[11px] text-muted-foreground">
+                        Sending command…
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
 
-            {group.site ? (
-              <p className="text-xs text-muted-foreground">Site: {group.site}</p>
-            ) : null}
-          </CardHeader>
+              {group.description ? (
+                <CardDescription>{group.description}</CardDescription>
+              ) : null}
+
+              {group.site ? (
+                <p className="text-xs text-muted-foreground">Site: {group.site}</p>
+              ) : null}
+            </CardHeader>
 
           <CardContent className="space-y-3">
             {group.devices.map((device) => {
@@ -124,7 +159,8 @@ export const DeviceGroupPanels = ({
             })}
           </CardContent>
         </Card>
-      ))}
+        );
+      })}
     </div>
   );
 };

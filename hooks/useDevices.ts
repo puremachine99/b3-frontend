@@ -11,10 +11,10 @@ import {
   GroupsService,
 } from "@/lib/api-client";
 import { useSocket } from "@/hooks/useSocket";
+import { fetchDeviceGroups } from "@/lib/group-client";
 
 import {
   mapApiDeviceToDevice,
-  mapApiGroupToGroup,
   mapApiLog,
   parseApiError,
   normalizeStatus,
@@ -172,10 +172,8 @@ export const useDevices = () => {
     try {
       setLoadingGroups(true);
 
-      const res = await GroupsService.groupsControllerFindAll();
-      const raw = Array.isArray(res) ? res : res?.data ?? [];
-
-      setGroups(raw.map(mapApiGroupToGroup));
+      const mappedGroups = await fetchDeviceGroups();
+      setGroups(mappedGroups);
     } catch (err) {
       console.error("Failed to load groups:", err);
     } finally {
@@ -297,7 +295,7 @@ export const useDevices = () => {
     }
   };
 
-  const assignDeviceToGroup = async (deviceId: string, groupId: string) => {
+  const assignDeviceToGroup = async (groupId: string, deviceId: string) => {
     try {
       await GroupsService.groupsControllerAddDevice(groupId, deviceId);
       await Promise.all([loadDevices(), loadGroups()]);

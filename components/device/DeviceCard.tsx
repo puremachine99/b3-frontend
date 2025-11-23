@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { IconTerminal2 } from "@tabler/icons-react";  
 import {
   Tooltip,
   TooltipTrigger,
@@ -106,9 +107,7 @@ export const DeviceCard = ({
       </div>
 
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium">
-          Power {isPowerOn ? "On" : "Off"}
-        </p>
+        <p className="text-sm font-medium">Power {isPowerOn ? "On" : "Off"}</p>
 
         <Switch
           checked={isPowerOn}
@@ -118,6 +117,7 @@ export const DeviceCard = ({
       </div>
 
       <Button className="w-full" onClick={() => onOpenLogs(device)}>
+        <IconTerminal2 className="size-4" />
         View Logs
       </Button>
     </div>

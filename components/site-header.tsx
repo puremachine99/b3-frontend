@@ -17,9 +17,9 @@ export function SiteHeader() {
         <h1 className="text-base font-medium">Documents</h1>
         <div className="ml-auto flex items-center gap-2">
           <ThemeToggle />
-          <Button variant="ghost" size="sm" asChild>
+          {/* <Button variant="ghost" size="sm" asChild>
             <Link href="/dashboard/settings">Settings</Link>
-          </Button>
+          </Button> */}
         </div>
       </div>
     </header>

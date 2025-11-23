@@ -22,12 +22,15 @@ interface Props {
   connectionMap: Record<string, "online" | "offline">;
 
   onTogglePower: (device: Device, checked: boolean) => void;
+  onToggleGroup: (group: DeviceGroup, checked: boolean) => void;
   onDelete: (device: Device) => void;
   onViewLogs: (device: Device) => void;
   onEdit: (device: Device) => void;
   onAssign: (device: Device) => void;
 
   logs: Record<string, any[]>;
+  groupToggleState: Record<string, boolean>;
+  groupToggleLoading: Record<string, boolean>;
 }
 
 export const DeviceTableView = ({
@@ -35,11 +38,14 @@ export const DeviceTableView = ({
   powerMap,
   connectionMap,
   onTogglePower,
+  onToggleGroup,
   onDelete,
   onViewLogs,
   onEdit,
   onAssign,
   logs,
+  groupToggleState,
+  groupToggleLoading,
 }: Props) => {
   return (
     <Card>
@@ -70,11 +76,14 @@ export const DeviceTableView = ({
                 powerMap={powerMap}
                 connectionMap={connectionMap}
                 onTogglePower={onTogglePower}
+                onToggleGroup={onToggleGroup}
                 onDelete={onDelete}
                 onViewLogs={onViewLogs}
                 onEdit={onEdit}
                 onAssign={onAssign}
                 logs={logs}
+                groupToggleState={groupToggleState}
+                groupToggleLoading={groupToggleLoading}
               />
             ))}
           </TableBody>
@@ -93,28 +102,58 @@ const GroupSection = ({
   powerMap,
   connectionMap,
   onTogglePower,
+  onToggleGroup,
   onDelete,
   onViewLogs,
   onEdit,
   onAssign,
   logs,
+  groupToggleState,
+  groupToggleLoading,
 }: {
   group: DeviceGroup;
   powerMap: Record<string, boolean>;
   connectionMap: Record<string, "online" | "offline">;
   onTogglePower: (device: Device, checked: boolean) => void;
+  onToggleGroup: (group: DeviceGroup, checked: boolean) => void;
   onDelete: (device: Device) => void;
   onViewLogs: (device: Device) => void;
   onEdit: (device: Device) => void;
   onAssign: (device: Device) => void;
   logs: Record<string, any[]>;
+  groupToggleState: Record<string, boolean>;
+  groupToggleLoading: Record<string, boolean>;
 }) => {
+  const isAllGroup = group.id === "all";
+  const fallbackChecked =
+    group.devices.length > 0 &&
+    group.devices.every((device) => powerMap[device.id]);
+  const checked = groupToggleState[group.id] ?? fallbackChecked;
+  const disabled =
+    isAllGroup ||
+    group.devices.length === 0 ||
+    groupToggleLoading[group.id];
+
   return (
     <>
       {/* Group Label */}
       <TableRow className="bg-muted/50">
         <TableCell colSpan={5} className="pl-6 font-semibold">
-          {group.name}
+          <div className="flex items-center justify-between">
+            <div>
+              {group.name}
+              <p className="text-xs font-normal text-muted-foreground">
+                {group.devices.length} device{group.devices.length === 1 ? "" : "s"}
+              </p>
+            </div>
+            {!isAllGroup ? (
+              <Switch
+                checked={checked}
+                disabled={disabled}
+                onCheckedChange={(value) => onToggleGroup(group, value)}
+              />
+            ) : null}
+          </div>
         </TableCell>
       </TableRow>
 

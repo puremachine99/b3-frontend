@@ -10,15 +10,17 @@ import {
   type CreateGroupDto,
   type UpdateGroupDto,
 } from "@/lib/api-client";
+import { fetchRawGroupsWithDevices } from "@/lib/group-client";
+
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -34,6 +36,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+
 import {
   Table,
   TableBody,
@@ -42,41 +45,73 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { toast } from "sonner";
 import { IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
 
+import { mapApiDeviceToDevice } from "@/utils/device";
+import type { Device } from "@/types/device";
+
+/* ============================
+   TYPES
+============================ */
 type Group = {
   id: string;
   name: string;
   description?: string;
   createdAt?: string;
+  deviceCount: number;
+  devices: Device[];
 };
-
-type ApiGroup = Record<string, any>; // missing from OpenAPI
 
 type UpdateGroupPayload = UpdateGroupDto & { id: string };
 
+/* ============================
+   PAGE
+============================ */
 export default function GroupsPage() {
   const router = useRouter();
+
   const [groups, setGroups] = React.useState<Group[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [view, setView] = React.useState<"cards" | "table">("table");
+
   const [addOpen, setAddOpen] = React.useState(false);
   const [editGroup, setEditGroup] = React.useState<Group | null>(null);
   const [deleteGroup, setDeleteGroup] = React.useState<Group | null>(null);
   const [deleteInput, setDeleteInput] = React.useState("");
+
   const [saving, setSaving] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
 
+  /* ============================
+     LOAD GROUPS
+  ============================ */
   const loadGroups = React.useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await GroupsService.groupsControllerFindAll();
-      const raw = Array.isArray(res) ? res : res?.data ?? [];
-      setGroups(raw);
+      const raw = await fetchRawGroupsWithDevices();
+
+      const normalized = raw.map((group) => {
+        const mappedDevices = Array.isArray(group?.devices)
+          ? group.devices.map((device: any) => {
+              const mapped = mapApiDeviceToDevice(device);
+              return { ...mapped, groupId: group?.id ?? mapped.groupId };
+            })
+          : [];
+
+        return {
+          id: group?.id ?? crypto.randomUUID(),
+          name: typeof group?.name === "string" ? group.name : "Unnamed Group",
+          description: typeof group?.description === "string" ? group.description : "",
+          createdAt: typeof group?.createdAt === "string" ? group.createdAt : undefined,
+          deviceCount: mappedDevices.length,
+          devices: mappedDevices,
+        };
+      });
+
+      setGroups(normalized);
     } catch (err) {
       console.error(err);
       setError(parseApiError(err));
@@ -94,16 +129,18 @@ export default function GroupsPage() {
     loadGroups();
   }, [loadGroups, router]);
 
+  /* ============================
+     CRUD HANDLERS
+  ============================ */
   const handleCreate = async (payload: CreateGroupDto) => {
     try {
       setSaving(true);
       await GroupsService.groupsControllerCreate(payload);
-      toast({ title: "Group created" });
+      toast("Group created");
       setAddOpen(false);
       await loadGroups();
     } catch (err) {
-      const msg = parseApiError(err);
-      toast({ title: "Failed to create group", description: msg, variant: "destructive" });
+      toast.error("Failed to create group", { description: parseApiError(err) });
       throw err;
     } finally {
       setSaving(false);
@@ -118,12 +155,11 @@ export default function GroupsPage() {
         description: payload.description,
         metadata: payload.metadata,
       });
-      toast({ title: "Group updated" });
+      toast("Group updated");
       setEditGroup(null);
       await loadGroups();
     } catch (err) {
-      const msg = parseApiError(err);
-      toast({ title: "Failed to update group", description: msg, variant: "destructive" });
+      toast.error("Failed to update group", { description: parseApiError(err) });
       throw err;
     } finally {
       setSaving(false);
@@ -135,22 +171,28 @@ export default function GroupsPage() {
     try {
       setDeleting(true);
       await GroupsService.groupsControllerRemove(deleteGroup.id);
-      toast({ title: "Group deleted" });
+      toast("Group deleted");
       setDeleteGroup(null);
       setDeleteInput("");
       await loadGroups();
     } catch (err) {
-      const msg = parseApiError(err);
-      toast({ title: "Failed to delete group", description: msg, variant: "destructive" });
+      toast.error("Failed to delete group", { description: parseApiError(err) });
       throw err;
     } finally {
       setDeleting(false);
     }
   };
 
-  const deleteDisabled =
-    !deleteGroup || deleteInput !== deleteGroup.name;
+  const deleteDisabled = !deleteGroup || deleteInput !== deleteGroup.name;
 
+  const totalGroupedDevices = React.useMemo(
+    () => groups.reduce((sum, group) => sum + group.deviceCount, 0),
+    [groups]
+  );
+
+  /* ============================
+     RENDER
+  ============================ */
   return (
     <SidebarProvider
       style={
@@ -163,22 +205,19 @@ export default function GroupsPage() {
       <AppSidebar variant="inset" />
       <SidebarInset>
         <SiteHeader />
+
         <div className="flex flex-1 flex-col">
           <section className="flex flex-1 flex-col gap-4 px-4 py-4 md:gap-6 md:py-6 lg:px-6">
+            {/* Page Header */}
             <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
               <div>
                 <h1 className="text-2xl font-semibold tracking-tight">Groups</h1>
                 <p className="text-sm text-muted-foreground">
-                  Kelola grup perangkat (GET/POST/PATCH/DELETE /groups)
+                  Manage groups (GET/POST/PATCH/DELETE /groups)
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Tabs value={view} onValueChange={(v) => setView(v as any)}>
-                  <TabsList>
-                    <TabsTrigger value="cards">Cards</TabsTrigger>
-                    <TabsTrigger value="table">Table</TabsTrigger>
-                  </TabsList>
-                </Tabs>
+
+              <div className="flex gap-2">
                 <Button onClick={() => setAddOpen(true)}>
                   <IconPlus className="size-4" />
                   Add Group
@@ -189,10 +228,11 @@ export default function GroupsPage() {
               </div>
             </div>
 
+            {/* Stats */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle>Statistik Grup</CardTitle>
-                <CardDescription>Langsung dari endpoint /groups</CardDescription>
+                <CardTitle>Group Statistics</CardTitle>
+                <CardDescription>Based on current GET /groups</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -207,11 +247,17 @@ export default function GroupsPage() {
                     value={groups.filter((g) => g.createdAt).length}
                     loading={loading}
                   />
-                  <StatTile label="Actions" value={2} loading={false} helper="Edit & Delete" />
+                  <StatTile
+                    label="Devices"
+                    value={totalGroupedDevices}
+                    loading={loading}
+                    helper="Across all groups"
+                  />
                 </div>
               </CardContent>
             </Card>
 
+            {/* Error */}
             {error ? (
               <Card className="border-destructive/40">
                 <CardHeader>
@@ -221,35 +267,27 @@ export default function GroupsPage() {
               </Card>
             ) : null}
 
-            {view === "cards" ? (
-              <GroupCards
-                groups={groups}
-                onEdit={setEditGroup}
-                onDelete={(g) => {
-                  setDeleteGroup(g);
-                  setDeleteInput("");
-                }}
-              />
-            ) : (
-              <GroupTable
-                groups={groups}
-                onEdit={setEditGroup}
-                onDelete={(g) => {
-                  setDeleteGroup(g);
-                  setDeleteInput("");
-                }}
-              />
-            )}
+            {/* TABLE ONLY */}
+            <GroupTable
+              groups={groups}
+              onEdit={setEditGroup}
+              onDelete={(g) => {
+                setDeleteGroup(g);
+                setDeleteInput("");
+              }}
+            />
           </section>
         </div>
       </SidebarInset>
 
+      {/* Dialogs */}
       <AddGroupDialog
         open={addOpen}
         onOpenChange={setAddOpen}
         onSubmit={handleCreate}
         loading={saving}
       />
+
       <EditGroupDialog
         group={editGroup}
         onOpenChange={(open) => {
@@ -258,6 +296,7 @@ export default function GroupsPage() {
         onSubmit={handleUpdate}
         loading={saving}
       />
+
       <DeleteGroupDialog
         group={deleteGroup}
         deleteInput={deleteInput}
@@ -276,69 +315,9 @@ export default function GroupsPage() {
   );
 }
 
-function GroupCards({
-  groups,
-  onEdit,
-  onDelete,
-}: {
-  groups: Group[];
-  onEdit: (group: Group) => void;
-  onDelete: (group: Group) => void;
-}) {
-  if (!groups.length) {
-    return (
-      <Card className="border-dashed">
-        <CardContent className="py-10 text-center text-muted-foreground">
-          Belum ada grup. Klik Add Group untuk menambahkan.
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {groups.map((group) => (
-        <Card key={group.id} className="h-full">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between text-base">
-              {group.name}
-              <Badge variant="outline">{group.id}</Badge>
-            </CardTitle>
-            {group.description ? (
-              <CardDescription>{group.description}</CardDescription>
-            ) : null}
-            {group.createdAt ? (
-              <p className="text-xs text-muted-foreground">
-                Created {new Date(group.createdAt).toLocaleString()}
-              </p>
-            ) : null}
-          </CardHeader>
-          <CardFooter className="pt-0">
-            <div className="ml-auto flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onEdit(group)}
-              >
-                <IconPencil className="size-4" />
-                Edit
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => onDelete(group)}
-              >
-                <IconTrash className="size-4" />
-                Delete
-              </Button>
-            </div>
-          </CardFooter>
-        </Card>
-      ))}
-    </div>
-  );
-}
-
+/* ============================
+   GROUP TABLE ONLY
+============================ */
 function GroupTable({
   groups,
   onEdit,
@@ -353,10 +332,10 @@ function GroupTable({
       <Card>
         <CardHeader className="border-b">
           <CardTitle>Group Table</CardTitle>
-          <CardDescription>Data dari GET /groups</CardDescription>
+          <CardDescription>Data from GET /groups</CardDescription>
         </CardHeader>
         <CardContent className="py-8 text-center text-muted-foreground">
-          Belum ada grup. Klik Add Group untuk membuat grup baru.
+          No groups yet. Click Add Group.
         </CardContent>
       </Card>
     );
@@ -366,17 +345,20 @@ function GroupTable({
     <Card>
       <CardHeader className="border-b">
         <CardTitle>Group Table</CardTitle>
-        <CardDescription>Data dari GET /groups</CardDescription>
+        <CardDescription>Data from GET /groups</CardDescription>
       </CardHeader>
+
       <CardContent className="px-0">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="pl-6">Name</TableHead>
               <TableHead>Description</TableHead>
+              <TableHead className="text-center">Devices</TableHead>
               <TableHead className="text-right pr-6">Actions</TableHead>
             </TableRow>
           </TableHeader>
+
           <TableBody>
             {groups.map((group) => (
               <TableRow key={group.id}>
@@ -384,17 +366,20 @@ function GroupTable({
                   <p className="font-semibold">{group.name}</p>
                   <p className="text-xs text-muted-foreground">{group.id}</p>
                 </TableCell>
+
                 <TableCell>{group.description || "-"}</TableCell>
+
+                <TableCell className="text-center">
+                  <Badge variant="secondary">{group.deviceCount}</Badge>
+                </TableCell>
+
                 <TableCell className="pr-6 text-right">
                   <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onEdit(group)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => onEdit(group)}>
                       <IconPencil className="size-4" />
                       Edit
                     </Button>
+
                     <Button
                       variant="destructive"
                       size="sm"
@@ -413,6 +398,10 @@ function GroupTable({
     </Card>
   );
 }
+
+/* ============================
+   DIALOGS
+============================ */
 
 function AddGroupDialog({
   open,
@@ -449,34 +438,31 @@ function AddGroupDialog({
           <DialogTitle>Add Group</DialogTitle>
           <DialogDescription>POST /groups</DialogDescription>
         </DialogHeader>
+
         <form className="space-y-3" onSubmit={handleSubmit}>
           <div className="space-y-1">
-            <Label htmlFor="group-name">Name</Label>
-            <Input
-              id="group-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
+            <Label>Name</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
+
           <div className="space-y-1">
-            <Label htmlFor="group-description">Description</Label>
+            <Label>Description</Label>
             <Input
-              id="group-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Optional description"
             />
           </div>
-          {localError ? (
-            <p className="text-sm text-destructive">{localError}</p>
-          ) : null}
+
+          {localError ? <p className="text-sm text-destructive">{localError}</p> : null}
+
           <DialogFooter>
             <DialogClose asChild>
               <Button variant="outline" type="button">
                 Cancel
               </Button>
             </DialogClose>
+
             <Button type="submit" disabled={loading}>
               {loading ? "Saving..." : "Save"}
             </Button>
@@ -511,6 +497,7 @@ function EditGroupDialog({
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!group) return;
+
     try {
       setLocalError(null);
       await onSubmit({ id: group.id, name, description });
@@ -527,34 +514,29 @@ function EditGroupDialog({
           <DialogTitle>Edit Group</DialogTitle>
           <DialogDescription>PATCH /groups/{group?.id ?? ""}</DialogDescription>
         </DialogHeader>
+
         <form className="space-y-3" onSubmit={handleSubmit}>
           <div className="space-y-1">
-            <Label htmlFor="edit-group-name">Name</Label>
-            <Input
-              id="edit-group-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
+            <Label>Name</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
+
           <div className="space-y-1">
-            <Label htmlFor="edit-group-description">Description</Label>
+            <Label>Description</Label>
             <Input
-              id="edit-group-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Optional description"
             />
           </div>
-          {localError ? (
-            <p className="text-sm text-destructive">{localError}</p>
-          ) : null}
+
+          {localError ? <p className="text-sm text-destructive">{localError}</p> : null}
+
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="outline" type="button">
-                Cancel
-              </Button>
+              <Button variant="outline">Cancel</Button>
             </DialogClose>
+
             <Button type="submit" disabled={loading}>
               {loading ? "Saving..." : "Save changes"}
             </Button>
@@ -588,22 +570,28 @@ function DeleteGroupDialog({
         <DialogHeader>
           <DialogTitle>Delete Group</DialogTitle>
           <DialogDescription>
-            Ketik nama <span className="font-semibold">{group?.name}</span> untuk konfirmasi.
+            Type{" "}
+            <span className="font-semibold">
+              {group?.name}
+            </span>{" "}
+            to confirm.
           </DialogDescription>
         </DialogHeader>
+
         <div className="space-y-1">
-          <Label htmlFor="delete-group">Group Name</Label>
+          <Label>Group Name</Label>
           <Input
-            id="delete-group"
             value={deleteInput}
             onChange={(e) => onDeleteInputChange(e.target.value)}
             placeholder={group?.name ?? ""}
           />
         </div>
+
         <DialogFooter className="sm:justify-between">
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
+
           <Button
             variant="destructive"
             disabled={disabled || loading}
@@ -617,6 +605,9 @@ function DeleteGroupDialog({
   );
 }
 
+/* ============================
+   UTILS
+============================ */
 function StatTile({
   label,
   value,
@@ -631,7 +622,9 @@ function StatTile({
   return (
     <div className="rounded-lg border p-3">
       <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="text-3xl font-semibold tabular-nums">{loading ? "…" : value}</p>
+      <p className="text-3xl font-semibold tabular-nums">
+        {loading ? "…" : value}
+      </p>
       {helper ? <p className="text-xs text-muted-foreground">{helper}</p> : null}
     </div>
   );
