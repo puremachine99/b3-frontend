@@ -4,10 +4,7 @@
 
 import { useEffect, useRef } from "react";
 import { io, Socket } from "socket.io-client";
-import {
-  extractRelayState,
-  extractConnectionState,
-} from "@/utils/device";
+import { extractRelayState, extractConnectionState } from "@/utils/device";
 
 import type { Device } from "@/types/device";
 import type { DeviceLog } from "@/types/logs";
@@ -18,6 +15,7 @@ interface UseSocketProps {
   onConnectionUpdate: (deviceId: string, status: "online" | "offline") => void;
   onPowerUpdate: (deviceId: string, powered: boolean) => void;
 }
+export type LogType = "INFO" | "WARN" | "ERROR" | "COMMAND" | "STATUS" | "LWT" | "AVAILABILITY";
 
 export const useSocket = ({
   getDevices,
@@ -161,7 +159,7 @@ export const useSocket = ({
       const log: DeviceLog = {
         id: `${deviceId}-${Date.now()}`,
         deviceId,
-        type: "LWT",
+        type: "STATUS",
         message: raw?.status || JSON.stringify(raw),
         payload: raw,
         timestamp: new Date().toISOString(),

@@ -4,13 +4,9 @@ import * as React from "react";
 import { usePathname } from "next/navigation";
 import type { Icon } from "@tabler/icons-react";
 import {
-  IconDevices,
   IconInnerShadowTop,
   IconLayoutDashboard,
-  IconLivePhoto,
   IconListDetails,
-  IconServer,
-  IconTopologyStar,
   IconUsers,
   IconUsersGroup,
 } from "@tabler/icons-react";
@@ -29,6 +25,10 @@ import {
   SidebarGroupLabel,
 } from "@/components/ui/sidebar";
 
+/* ================================
+   TYPE DEFINITIONS — FIXED
+================================ */
+
 type MenuItem = {
   title: string;
   url: string;
@@ -38,27 +38,33 @@ type MenuItem = {
 
 type MenuSection = {
   title: string;
-  icon: Icon;
-  url?: string;
-  items?: MenuItem[];
+  items: MenuItem[];
 };
+
+/* ================================
+   MENU DATA
+================================ */
 
 const data = {
   user: {
     name: "shadcn",
     email: "m@example.com",
-    avatar: "", // fallback to initials if not provided
+    avatar: "",
   },
   menu: [
     {
-      title: "Dashboard",
-      icon: IconLayoutDashboard,
-      url: "/dashboard",
-      match: "exact",
+      title: "Main",
+      items: [
+        {
+          title: "Dashboard",
+          icon: IconLayoutDashboard,
+          url: "/dashboard",
+          match: "exact",
+        },
+      ],
     },
     {
       title: "Devices",
-      icon: IconDevices,
       items: [
         {
           title: "Device List",
@@ -76,11 +82,10 @@ const data = {
     },
     {
       title: "Users",
-      icon: IconUsers,
       items: [
         {
           title: "User List",
-          icon: IconListDetails,
+          icon: IconUsers,
           url: "/dashboard/users",
           match: "startsWith",
         },
@@ -89,32 +94,34 @@ const data = {
   ] satisfies MenuSection[],
 };
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+/* ================================
+   SIDEBAR COMPONENT
+================================ */
+
+export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
   const [user, setUser] = React.useState(data.user);
 
   React.useEffect(() => {
     try {
-      const stored = typeof window !== "undefined" ? localStorage.getItem("user") : null;
+      const stored = localStorage.getItem("user");
       if (stored) {
         const parsed = JSON.parse(stored);
         setUser((prev) => ({
           ...prev,
-          name: parsed?.username || parsed?.name || prev.name,
-          email: parsed?.email || prev.email,
+          name: parsed?.username ?? parsed?.name ?? prev.name,
+          email: parsed?.email ?? prev.email,
         }));
       }
-    } catch (error) {
-      console.error("Failed to load user from storage", error);
+    } catch (e) {
+      console.error("Failed to load user", e);
     }
   }, []);
 
-  const isActive = (item: MenuItem | MenuSection) => {
+  const isActive = (item: MenuItem) => {
     const mode = item.match ?? "startsWith";
-    if (mode === "exact") {
-      return pathname === item.url;
-    }
-    return pathname.startsWith(item.url ?? "");
+    if (mode === "exact") return pathname === item.url;
+    return pathname.startsWith(item.url);
   };
 
   return (
@@ -134,52 +141,41 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent>
-        {data.menu.map((section) =>
-          section.items ? (
-            // SECTION / GROUP
-            <SidebarGroup key={section.title}>
-              <SidebarGroupLabel className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide">
-                <section.icon className="size-4" />
-                <span>{section.title}</span>
-              </SidebarGroupLabel>
 
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {section.items.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton
-                        asChild
-                        tooltip={item.title}
-                        isActive={isActive(item)}
-                      >
-                        <a href={item.url}>
-                          <item.icon />
-                          <span>{item.title}</span>
-                        </a>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          ) : (
-            // SINGLE ITEM (DASHBOARD)
-            <SidebarMenuItem key={section.title}>
-              <SidebarMenuButton
-                asChild
-                tooltip={section.title}
-                isActive={isActive(section)}
-              >
-                <a href={section.url}>
-                  <section.icon />
-                  <span>{section.title}</span>
-                </a>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )
-        )}
+      <SidebarContent>
+        {data.menu.map((section) => (
+          <SidebarGroup key={section.title}>
+            <SidebarGroupLabel className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide">
+              {(() => {
+                const IconComp = section.items[0]?.icon;
+                if (!IconComp) return null;
+                return <IconComp className="size-4 opacity-50" />;
+              })()}
+              <span>{section.title}</span>
+            </SidebarGroupLabel>
+
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {section.items.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      tooltip={item.title}
+                      isActive={isActive(item)}
+                    >
+                      <a href={item.url}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
+
       <SidebarFooter>
         <NavUser user={user} />
       </SidebarFooter>

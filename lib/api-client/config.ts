@@ -19,11 +19,13 @@ export const configureApiClient = () => {
 
   OpenAPI.BASE = resolveBaseUrl();
   OpenAPI.WITH_CREDENTIALS = false;
-  OpenAPI.TOKEN = async () => {
+  OpenAPI.TOKEN = async (): Promise<string> => {
     if (typeof window === "undefined") {
-      return undefined;
+      return ""; // ❗ SSR harus return string
     }
-    return localStorage.getItem("token") ?? undefined;
+
+    const token = localStorage.getItem("token");
+    return token ?? ""; // ❗ jangan pernah return undefined
   };
 
   configured = true;

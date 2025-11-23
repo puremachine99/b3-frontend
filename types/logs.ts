@@ -1,6 +1,14 @@
 // src/types/logs.ts
 
-export type LogType = "STATUS" | "COMMAND" | "SYSTEM" | "ERROR" | "LOG";
+export type LogType =
+  | "INFO"
+  | "WARN"
+  | "ERROR"
+  | "COMMAND"
+  | "STATUS"
+  | "LOG"
+  | "LWT"
+  | "AVAILABILITY";
 
 export interface DeviceLog {
   id: string;

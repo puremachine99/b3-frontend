@@ -103,12 +103,15 @@ export const useDevices = () => {
     []
   );
 
-  const handleSocketPower = useCallback((deviceId: string, powered: boolean) => {
-    setPowerMap((prev) => ({
-      ...prev,
-      [deviceId]: powered,
-    }));
-  }, []);
+  const handleSocketPower = useCallback(
+    (deviceId: string, powered: boolean) => {
+      setPowerMap((prev) => ({
+        ...prev,
+        [deviceId]: powered,
+      }));
+    },
+    []
+  );
 
   const handleSocketLog = useCallback(
     (deviceId: string, log: DeviceLog) => {
@@ -134,21 +137,21 @@ export const useDevices = () => {
       setError(null);
 
       const res = await DevicesService.devicesControllerFindAll();
-      const rawDevices = Array.isArray(res)
-        ? res
-        : res?.data ?? [];
+      const rawDevices = Array.isArray(res) ? res : res?.data ?? [];
 
       const mapped = rawDevices.map(mapApiDeviceToDevice);
       setDevices(mapped);
 
       // Initial power & connection
       setPowerMap(
-        Object.fromEntries(mapped.map((d) => [d.id, d.status === "online"]))
+        Object.fromEntries(
+          mapped.map((d: Device) => [d.id, d.status === "online"])
+        )
       );
 
       setConnectionMap(
         Object.fromEntries(
-          mapped.map((d) => [
+          mapped.map((d: Device) => [
             d.serial || d.id,
             d.status === "online" ? "online" : "offline",
           ])
@@ -192,20 +195,21 @@ export const useDevices = () => {
           const key = dev.serial || dev.id;
           if (!key) return null;
 
-          const res =
-            await DeviceLogsService.deviceLogsControllerGetDeviceLogs(key);
-          const rawLogs = Array.isArray(res)
-            ? res
-            : res?.data ?? [];
+          const res = await DeviceLogsService.deviceLogsControllerGetDeviceLogs(
+            key
+          );
+          const rawLogs = Array.isArray(res) ? res : res?.data ?? [];
 
           const mappedLogs = rawLogs.map((item: any, idx: number) =>
             mapApiLog(dev, item, idx)
           );
+          type RelayState = "ON" | "OFF" | null;
 
-          // power state via relay
           const relay = mappedLogs
-            .map((l) => extractRelayState(l.payload))
-            .find((v) => v !== null);
+            .map((l: DeviceLog) => extractRelayState(l.payload) as RelayState)
+            .find(
+              (v: RelayState): v is "ON" | "OFF" => v === "ON" || v === "OFF"
+            );
 
           if (relay) {
             setPowerMap((prev) => ({
@@ -240,7 +244,8 @@ export const useDevices = () => {
 
   const createDevice = async (payload: CreateDeviceInput) => {
     try {
-      const defaultStatus = (payload.status ?? "OFFLINE") as CreateDeviceDto["status"];
+      const defaultStatus = (payload.status ??
+        "OFFLINE") as CreateDeviceDto["status"];
       await DevicesService.devicesControllerCreate({
         serialNumber: payload.serialNumber,
         name: payload.name,

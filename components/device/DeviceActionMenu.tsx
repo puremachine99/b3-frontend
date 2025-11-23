@@ -1,5 +1,6 @@
 "use client";
 
+import { IconDots, IconPencil, IconTrash, IconUserPlus, IconTerminal2 } from "@tabler/icons-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -7,80 +8,64 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-
 import { Button } from "@/components/ui/button";
-
-import {
-  IconDotsVertical,
-  IconDeviceFloppy,
-  IconUsersGroup,
-  IconTerminal2,
-  IconTrash,
-} from "@tabler/icons-react";
-
 import type { Device } from "@/types/device";
 
 interface Props {
   device: Device;
-  onDelete: (device: Device) => void;
-  onViewLogs: (device: Device) => void;
-  onEdit: (device: Device) => void;
-  onAssign: (device: Device) => void;
+  onEdit: (d: Device) => void;
+  onAssign: (d: Device) => void;
+  onDelete: (d: Device) => void;
+  onViewLogs: (d: Device) => void;
+
+  /** FIX: tambahin properti ini */
+  disabledActions?: boolean;
 }
 
-export const DeviceActionMenu = ({
+export function DeviceActionMenu({
   device,
-  onDelete,
-  onViewLogs,
   onEdit,
   onAssign,
-}: Props) => {
-  const isOffline = device.status === "offline";
-
+  onDelete,
+  onViewLogs,
+  disabledActions = false,
+}: Props) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          variant="ghost"
+          variant="outline"
           size="icon"
-          className="size-7 rounded-full hover:bg-muted"
+          className="size-8"
+          disabled={disabledActions}
         >
-          <IconDotsVertical className="size-4" />
-          <span className="sr-only">Device actions</span>
+          <IconDots className="size-4" />
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-48">
-        {/* EDIT — enable always */}
-        <DropdownMenuItem onSelect={() => onEdit(device)}>
-          <IconDeviceFloppy className="size-4" />
-          Edit Device
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem disabled={disabledActions} onSelect={() => onEdit(device)}>
+          <IconPencil className="size-4" /> Edit
         </DropdownMenuItem>
 
-        {/* ASSIGN — enable always */}
-        <DropdownMenuItem onSelect={() => onAssign(device)}>
-          <IconUsersGroup className="size-4" />
-          Add to Group
+        <DropdownMenuItem disabled={disabledActions} onSelect={() => onAssign(device)}>
+          <IconUserPlus className="size-4" /> Assign Group
         </DropdownMenuItem>
 
-        {/* VIEW LOGS — enable always */}
-        <DropdownMenuItem onSelect={() => onViewLogs(device)}>
-          <IconTerminal2 className="size-4" />
-          View Logs
+        <DropdownMenuItem disabled={disabledActions} onSelect={() => onViewLogs(device)}>
+          <IconTerminal2 className="size-4" /> View Logs
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
 
-        {/* DELETE — ONLY disabled if offline */}
         <DropdownMenuItem
-          disabled={isOffline}
+          className="text-destructive"
+          disabled={disabledActions}
           onSelect={() => onDelete(device)}
-          className="text-rose-600 focus:text-rose-700"
         >
-          <IconTrash className="size-4" />
-          Delete
+          <IconTrash className="size-4" /> Delete
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
-};
+}
