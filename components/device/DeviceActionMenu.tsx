@@ -22,13 +22,10 @@ import type { Device } from "@/types/device";
 
 interface Props {
   device: Device;
-
   onDelete: (device: Device) => void;
   onViewLogs: (device: Device) => void;
   onEdit: (device: Device) => void;
   onAssign: (device: Device) => void;
-
-  disabledActions?: boolean;
 }
 
 export const DeviceActionMenu = ({
@@ -37,11 +34,8 @@ export const DeviceActionMenu = ({
   onViewLogs,
   onEdit,
   onAssign,
-  disabledActions = false,
 }: Props) => {
   const isOffline = device.status === "offline";
-  const disableNonDeleteActions = disabledActions || isOffline;
-  const disableDelete = disabledActions;
 
   return (
     <DropdownMenu>
@@ -57,38 +51,29 @@ export const DeviceActionMenu = ({
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-48">
-        {/* EDIT */}
-        <DropdownMenuItem
-          disabled={disableNonDeleteActions}
-          onSelect={() => onEdit(device)}
-        >
+        {/* EDIT — enable always */}
+        <DropdownMenuItem onSelect={() => onEdit(device)}>
           <IconDeviceFloppy className="size-4" />
           Edit Device
         </DropdownMenuItem>
 
-        {/* ASSIGN */}
-        <DropdownMenuItem
-          disabled={disableNonDeleteActions}
-          onSelect={() => onAssign(device)}
-        >
+        {/* ASSIGN — enable always */}
+        <DropdownMenuItem onSelect={() => onAssign(device)}>
           <IconUsersGroup className="size-4" />
           Add to Group
         </DropdownMenuItem>
 
-        {/* VIEW LOGS */}
-        <DropdownMenuItem
-          disabled={disableNonDeleteActions}
-          onSelect={() => onViewLogs(device)}
-        >
+        {/* VIEW LOGS — enable always */}
+        <DropdownMenuItem onSelect={() => onViewLogs(device)}>
           <IconTerminal2 className="size-4" />
           View Logs
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
 
-        {/* DELETE */}
+        {/* DELETE — ONLY disabled if offline */}
         <DropdownMenuItem
-          disabled={disableDelete}
+          disabled={isOffline}
           onSelect={() => onDelete(device)}
           className="text-rose-600 focus:text-rose-700"
         >
