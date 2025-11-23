@@ -34,6 +34,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
       const name = user?.username || user?.name || user?.email || "there"
       toast.success(`Hi ${name}, welcome back!`)
       router.push("/dashboard")
+      router.refresh()
     } catch (err: unknown) {
       setError(parseApiError(err))
     } finally {

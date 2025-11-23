@@ -263,13 +263,20 @@ export const parseApiError = (error: unknown): string => {
   if (error instanceof ApiError) {
     const body = error.body as Record<string, unknown> | undefined;
     const message = body?.message ?? body?.error;
-    if (Array.isArray(message)) {
-      return message.join(", ");
-    }
-    if (typeof message === "string" && message.trim()) {
-      return message;
-    }
-    return error.message || "Request failed";
+    const statusLabel = [error.status, error.statusText]
+      .filter((part) => part && String(part).trim())
+      .join(" ");
+    const target = error.url
+      ? `${error.request?.method ?? "GET"} ${error.url}`
+      : "";
+
+    const resolvedMessage = Array.isArray(message)
+      ? message.join(", ")
+      : typeof message === "string" && message.trim()
+        ? message
+        : error.message || "Request failed";
+
+    return [resolvedMessage, statusLabel, target].filter(Boolean).join(" — ");
   }
 
   if (

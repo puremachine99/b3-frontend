@@ -83,7 +83,11 @@ export default function Page() {
 
       if (groupRes.status === "fulfilled") {
         const raw = groupRes.value;
-        const apiGroups = Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : [];
+        const apiGroups = Array.isArray(raw?.data)
+          ? raw.data
+          : Array.isArray(raw)
+          ? raw
+          : [];
         setGroups(apiGroups.map(mapGroup));
       } else {
         setGroups([]);
@@ -104,8 +108,12 @@ export default function Page() {
     [devices]
   );
 
-  const onlineDevices = filteredDevices.filter((d) => d.status === "online").length;
-  const errorDevices = filteredDevices.filter((d) => d.status === "error").length;
+  const onlineDevices = filteredDevices.filter(
+    (d) => d.status === "online"
+  ).length;
+  const errorDevices = filteredDevices.filter(
+    (d) => d.status === "error"
+  ).length;
   const offlineDevices = filteredDevices.length - onlineDevices - errorDevices;
 
   const latestDevices = filteredDevices.slice(0, 8);
@@ -127,7 +135,10 @@ export default function Page() {
     const initMap = () => {
       if (!mapContainerRef.current || mapRef.current || !window.L) return;
       const L = window.L;
-      mapRef.current = L.map(mapContainerRef.current).setView([-6.17511, 106.865039], 11);
+      mapRef.current = L.map(mapContainerRef.current).setView(
+        [-6.17511, 106.865039],
+        11
+      );
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap",
@@ -159,32 +170,56 @@ export default function Page() {
   }, []);
 
   React.useEffect(() => {
-    if (!leafletReady || !mapRef.current || !markerLayerRef.current || !window.L) return;
+    if (
+      !leafletReady ||
+      !mapRef.current ||
+      !markerLayerRef.current ||
+      !window.L
+    )
+      return;
     const L = window.L;
+
+    // Clear existing markers
     markerLayerRef.current.clearLayers();
 
     const validDevices = filteredDevices.filter(
-      (d) => typeof d.latitude === "number" && typeof d.longitude === "number"
+      (d) =>
+        typeof d.latitude === "number" &&
+        !Number.isNaN(d.latitude) &&
+        typeof d.longitude === "number" &&
+        !Number.isNaN(d.longitude)
     );
 
+    // If no device has valid coordinates, stop here – prevent crashes
+    if (validDevices.length === 0) {
+      return; // <── FIX: Avoid Leaflet “Bounds are not valid”
+    }
+
+    // Add markers
     validDevices.forEach((device) => {
       const marker = L.marker([device.latitude!, device.longitude!], {
         title: device.name,
       });
+
       marker.bindTooltip(
         `<div class="space-y-1">
-            <div class="font-semibold">${device.name}</div>
-            <div class="text-xs text-muted-foreground">${device.serial}</div>
-            <div class="text-xs">${device.location ?? "-"}</div>
-            <div class="text-xs">${device.status}</div>
-        </div>`,
+        <div class="font-semibold">${device.name}</div>
+        <div class="text-xs text-muted-foreground">${device.serial}</div>
+        <div class="text-xs">${device.location ?? "-"}</div>
+        <div class="text-xs">${device.status}</div>
+      </div>`,
         { direction: "top" }
       );
+
       markerLayerRef.current.addLayer(marker);
     });
 
-    if (validDevices.length) {
-      const bounds = L.latLngBounds(validDevices.map((d) => [d.latitude!, d.longitude!]));
+    // Fit bounds only when valid markers exist
+    const bounds = L.latLngBounds(
+      validDevices.map((d) => [d.latitude!, d.longitude!])
+    );
+
+    if (bounds.isValid()) {
       mapRef.current.fitBounds(bounds.pad(0.2));
     }
   }, [filteredDevices, leafletReady]);
@@ -204,7 +239,9 @@ export default function Page() {
         <div className="flex flex-1 flex-col px-4 py-4 md:px-6 md:py-6 gap-4 md:gap-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+              <h1 className="text-2xl font-semibold tracking-tight">
+                Dashboard
+              </h1>
               <p className="text-sm text-muted-foreground">
                 Summary of your device network status and statistics.
               </p>
@@ -217,7 +254,9 @@ export default function Page() {
           {error ? (
             <Card className="border-destructive/40">
               <CardHeader>
-                <CardTitle className="text-destructive">Dashboard Loading Failed</CardTitle>
+                <CardTitle className="text-destructive">
+                  Dashboard Loading Failed
+                </CardTitle>
                 <CardDescription>{error}</CardDescription>
               </CardHeader>
             </Card>
@@ -230,10 +269,26 @@ export default function Page() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <StatBox label="Total Devices" value={devices.length} loading={loading} />
-                <StatBox label="Online" value={onlineDevices} loading={loading} />
-                <StatBox label="Offline" value={offlineDevices} loading={loading} />
-                <StatBox label="Groups" value={groups.length} loading={loading} />
+                <StatBox
+                  label="Total Devices"
+                  value={devices.length}
+                  loading={loading}
+                />
+                <StatBox
+                  label="Online"
+                  value={onlineDevices}
+                  loading={loading}
+                />
+                <StatBox
+                  label="Offline"
+                  value={offlineDevices}
+                  loading={loading}
+                />
+                <StatBox
+                  label="Groups"
+                  value={groups.length}
+                  loading={loading}
+                />
               </div>
             </CardContent>
           </Card>
@@ -275,7 +330,9 @@ export default function Page() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {loading ? (
-                  <p className="text-sm text-muted-foreground">Loading groups...</p>
+                  <p className="text-sm text-muted-foreground">
+                    Loading groups...
+                  </p>
                 ) : groups.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No Group yet.</p>
                 ) : (
@@ -290,7 +347,9 @@ export default function Page() {
                             </p>
                           ) : null}
                         </div>
-                        <Badge variant="secondary">{group.devices} devices</Badge>
+                        <Badge variant="secondary">
+                          {group.devices} devices
+                        </Badge>
                       </div>
                     </div>
                   ))
@@ -304,22 +363,44 @@ export default function Page() {
   );
 }
 
-function StatBox({ label, value, loading }: { label: string; value: number; loading: boolean }) {
+function StatBox({
+  label,
+  value,
+  loading,
+}: {
+  label: string;
+  value: number;
+  loading: boolean;
+}) {
   return (
     <div className="rounded-lg border p-3">
       <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="text-3xl font-semibold tabular-nums">{loading ? "…" : value}</p>
+      <p className="text-3xl font-semibold tabular-nums">
+        {loading ? "…" : value}
+      </p>
     </div>
   );
 }
 
-function DeviceTable({ devices, loading }: { devices: Device[]; loading: boolean }) {
+function DeviceTable({
+  devices,
+  loading,
+}: {
+  devices: Device[];
+  loading: boolean;
+}) {
   if (loading) {
-    return <p className="text-sm text-muted-foreground px-2 py-4">Loading devices...</p>;
+    return (
+      <p className="text-sm text-muted-foreground px-2 py-4">
+        Loading devices...
+      </p>
+    );
   }
 
   if (!devices.length) {
-    return <p className="text-sm text-muted-foreground px-2 py-4">No Device Yet.</p>;
+    return (
+      <p className="text-sm text-muted-foreground px-2 py-4">No Device Yet.</p>
+    );
   }
 
   return (
@@ -338,7 +419,9 @@ function DeviceTable({ devices, loading }: { devices: Device[]; loading: boolean
           {devices.map((device) => (
             <TableRow key={device.id}>
               <TableCell className="font-medium">{device.name}</TableCell>
-              <TableCell className="font-mono text-xs">{device.serial}</TableCell>
+              <TableCell className="font-mono text-xs">
+                {device.serial}
+              </TableCell>
               <TableCell>
                 <StatusBadge status={device.status} />
               </TableCell>
