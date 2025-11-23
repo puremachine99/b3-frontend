@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { api } from "@/lib/api";
+import "@/lib/api-client/config";
+import { GroupsService } from "@/lib/api-client";
 import type { DeviceGroup } from "@/types/group";
 import { mapApiGroupToGroup } from "@/utils/device";
 import { parseApiError } from "@/utils/device";
@@ -13,10 +14,8 @@ export const useGroups = () => {
   const loadGroups = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get("/groups");
-      const raw = Array.isArray(res.data)
-        ? res.data
-        : res.data?.data ?? [];
+      const res = await GroupsService.groupsControllerFindAll();
+      const raw = Array.isArray(res) ? res : res?.data ?? [];
 
       setGroups(raw.map(mapApiGroupToGroup));
     } catch (error) {

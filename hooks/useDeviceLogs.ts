@@ -3,7 +3,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { api } from "@/lib/api";
+import "@/lib/api-client/config";
+import { DeviceLogsService } from "@/lib/api-client";
 
 import {
   mergeAndSortLogs,
@@ -54,8 +55,10 @@ export const useDeviceLogs = ({ device, memoryLogs }: UseDeviceLogsProps) => {
       setError(null);
 
       const serial = device.serial || device.id;
-      const res = await api.get(`/device-logs/${serial}`);
-      const raw = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+      const res = await DeviceLogsService.deviceLogsControllerGetDeviceLogs(
+        serial
+      );
+      const raw = Array.isArray(res) ? res : res?.data ?? [];
 
       const mapped = raw.map((item: any, i: number) =>
         mapApiLog(device, item, i)

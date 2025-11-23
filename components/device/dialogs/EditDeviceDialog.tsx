@@ -16,26 +16,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+import type { UpdateDeviceDto } from "@/lib/api-client";
 import type { Device } from "@/types/device";
 import { parseCoordinateInput } from "@/utils/coords";
 
 interface Props {
   device: Device | null;
-
+  canEditSerial?: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (payload: {
-    id: string;
-    name: string;
-    serialNumber: string;
-    location?: string;
-    description?: string;
-    latitude?: number | null;
-    longitude?: number | null;
-    groupId?: string;
-  }) => Promise<void>;
+  onSubmit: (payload: (UpdateDeviceDto & { id: string; groupId?: string })) => Promise<void>;
 }
 
-export const EditDeviceDialog = ({ device, onOpenChange, onSubmit }: Props) => {
+export const EditDeviceDialog = ({
+  device,
+  canEditSerial = false,
+  onOpenChange,
+  onSubmit,
+}: Props) => {
   /* FORM STATES */
   const [name, setName] = useState("");
   const [serialNumber, setSerial] = useState("");
@@ -68,14 +65,17 @@ export const EditDeviceDialog = ({ device, onOpenChange, onSubmit }: Props) => {
     setError(null);
 
     try {
+      const latitudeValue = parseCoordinateInput(latitude);
+      const longitudeValue = parseCoordinateInput(longitude);
+
       await onSubmit({
         id: device.id,
         name,
         serialNumber,
         location,
         description,
-        latitude: parseCoordinateInput(latitude),
-        longitude: parseCoordinateInput(longitude),
+        latitude: latitudeValue ?? undefined,
+        longitude: longitudeValue ?? undefined,
         groupId: device.groupId,
       });
 
@@ -107,7 +107,12 @@ export const EditDeviceDialog = ({ device, onOpenChange, onSubmit }: Props) => {
           {/* SERIAL */}
           <div>
             <Label>Serial Number</Label>
-            <Input value={serialNumber} onChange={(e) => setSerial(e.target.value)} required />
+            <Input
+              value={serialNumber}
+              onChange={(e) => setSerial(e.target.value)}
+              required
+              disabled={!canEditSerial}
+            />
           </div>
 
           {/* LOCATION */}

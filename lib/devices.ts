@@ -1,19 +1,21 @@
-import { api } from "./api";
+import "@/lib/api-client/config";
+import { DevicesService } from "@/lib/api-client";
 
 export async function getDevices() {
-  const res = await api.get("/devices");
-  return res.data;
+  return DevicesService.devicesControllerFindAll();
 }
 
 export async function getDevice(id: string) {
-  const res = await api.get(`/devices/${id}`);
-  return res.data;
+  return DevicesService.devicesControllerFindOne(id);
 }
 
-export async function sendCommand(id: string, payload: any) {
-  return api.post(`/devices/${id}/cmd`, { payload });
+export async function sendCommand(
+  id: string,
+  payload: Record<string, unknown>
+) {
+  return DevicesService.devicesControllerSendCommand(id, { payload });
 }
 
 export async function deleteDevice(id: string) {
-  return api.delete(`/devices/${id}`);
+  return DevicesService.devicesControllerRemove(id);
 }

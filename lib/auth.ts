@@ -1,11 +1,13 @@
-import axios from "axios";
-import { api } from "./api";
+import "@/lib/api-client/config";
+import { ApiError, AuthService } from "@/lib/api-client";
+import type { LoginDto } from "@/lib/api-client";
 
 export async function login(email: string, password: string) {
+  const payload: LoginDto = { email, password };
   try {
-    const res = await api.post("/auth/login", { email, password });
-    const token = res.data.access_token;
-    const user = res.data.user;
+    const res = await AuthService.authControllerLogin(payload);
+    const token = res?.access_token;
+    const user = res?.user;
 
     if (!token) throw new Error("Token tidak ditemukan di response");
 
@@ -17,14 +19,8 @@ export async function login(email: string, password: string) {
     document.cookie = `token=${token}; path=/; max-age=${60 * 60 * 24 * 7}`; // 7 days
     return { token, user };
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response) {
-      const message =
-        error.response.data?.message ||
-        error.response.data?.error ||
-        "Login gagal";
-      throw new Error(
-        Array.isArray(message) ? message.join(", ") : String(message)
-      );
+    if (error instanceof ApiError) {
+      throw error;
     }
     throw new Error("Login gagal");
   }

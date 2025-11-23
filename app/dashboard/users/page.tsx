@@ -3,7 +3,13 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 
-import { api } from "@/lib/api";
+import "@/lib/api-client/config";
+import {
+  ApiError,
+  UsersService,
+  type CreateUserDto,
+  type UpdateUserDto,
+} from "@/lib/api-client";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { Badge } from "@/components/ui/badge";
@@ -60,27 +66,10 @@ type User = {
   createdAt?: string;
 };
 
-type ApiUser = {
-  id: string;
-  username: string;
-  email: string;
-  role: string;
-  createdAt?: string;
-};
+type ApiUser = Record<string, any>; // missing from OpenAPI
 
-type NewUserPayload = {
-  username: string;
-  email: string;
-  password: string;
-  role: string;
-};
-
-type UpdateUserPayload = {
-  id: string;
-  email?: string;
-  password?: string;
-  role?: string;
-};
+type NewUserPayload = CreateUserDto;
+type UpdateUserPayload = UpdateUserDto & { id: string };
 
 export default function Page() {
   const router = useRouter();
@@ -99,8 +88,8 @@ export default function Page() {
     try {
       setLoading(true);
       setError(null);
-      const res = await api.get<ApiUser[]>("/users");
-      const apiUsers = res.data ?? [];
+      const res = await UsersService.usersControllerFindAll();
+      const apiUsers = Array.isArray(res) ? res : res?.data ?? [];
       setUsers(apiUsers);
     } catch (err) {
       console.error(err);
@@ -119,10 +108,15 @@ export default function Page() {
     loadUsers();
   }, [loadUsers, router]);
 
-  const handleCreate = async (payload: NewUserPayload) => {
+  const handleCreate = async (payload: CreateUserDto) => {
     try {
       setSaving(true);
-      await api.post("/users", payload);
+      await UsersService.usersControllerCreate({
+        username: payload.username,
+        email: payload.email,
+        password: payload.password,
+        role: payload.role as CreateUserDto["role"],
+      });
       toast({ title: "User created" });
       setAddOpen(false);
       await loadUsers();
@@ -139,7 +133,12 @@ export default function Page() {
   const handleUpdate = async (payload: UpdateUserPayload) => {
     try {
       setSaving(true);
-      await api.patch(`/users/${payload.id}`, payload);
+      await UsersService.usersControllerUpdate(payload.id, {
+        username: payload.username,
+        email: payload.email,
+        password: payload.password,
+        role: payload.role as UpdateUserDto["role"],
+      });
       toast({ title: "User updated" });
       setEditUser(null);
       await loadUsers();
@@ -156,7 +155,7 @@ export default function Page() {
     if (!deleteUser) return;
     try {
       setDeleting(true);
-      await api.delete(`/users/${deleteUser.id}`);
+      await UsersService.usersControllerRemove(deleteUser.id);
       toast({ title: "User deleted" });
       setDeleteUser(null);
       setDeleteInput("");
@@ -411,7 +410,12 @@ function AddUserDialog({
     event.preventDefault();
     try {
       setLocalError(null);
-      await onSubmit({ username, email, password, role });
+      await onSubmit({
+        username,
+        email,
+        password,
+        role: role as CreateUserDto["role"],
+      });
       setUsername("");
       setEmail("");
       setPassword("");
@@ -520,7 +524,7 @@ function EditUserDialog({
         id: user.id,
         email,
         password: password || undefined,
-        role,
+        role: role as UpdateUserDto["role"],
       });
       onOpenChange(false);
     } catch (err) {
@@ -638,6 +642,13 @@ function DeleteUserDialog({
 }
 
 function parseApiError(error: unknown): string {
+  if (error instanceof ApiError) {
+    const body = error.body as Record<string, unknown> | undefined;
+    const message = body?.message || body?.error || error.message;
+    if (Array.isArray(message)) return message.join(", ");
+    if (typeof message === "string") return message;
+    return error.message || "Request failed";
+  }
   if (typeof error === "string") return error;
   if (
     typeof error === "object" &&

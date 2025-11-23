@@ -105,22 +105,27 @@ export const useSocket = ({
       if (!device) return;
 
       const statusStr = raw?.status;
-      const up = statusStr ? statusStr.toLowerCase() : "";
-
-      const online = up === "online" || up === "on" || up.includes("connected");
-
+      const normalized = statusStr ? statusStr.toLowerCase() : "";
       const logKey = device.serial || device.id;
-      onConnectionUpdate(logKey, online ? "online" : "offline");
 
-      // If the status message indicates ON/OFF relay, update power
-      if (up === "on" || up === "online") {
-        onPowerUpdate(device.id, true);
-      }
-      if (up === "off" || up === "offline") {
-        onPowerUpdate(device.id, false);
+      const indicatesConnection =
+        normalized === "online" ||
+        normalized === "offline" ||
+        normalized.includes("connected") ||
+        normalized.includes("disconnected");
+
+      if (indicatesConnection) {
+        const nextState =
+          normalized === "offline" || normalized.includes("disconnected")
+            ? "offline"
+            : "online";
+        onConnectionUpdate(logKey, nextState);
       }
 
-      // Also push to logs
+      if (normalized === "on" || normalized === "off") {
+        onPowerUpdate(device.id, normalized === "on");
+      }
+
       const log: DeviceLog = {
         id: `${deviceId}-${Date.now()}`,
         deviceId,
@@ -144,7 +149,6 @@ export const useSocket = ({
       );
       if (!device) return;
 
-      // payload may contain connection info
       const conn = extractConnectionState({
         message: raw?.status,
         payload: raw,
@@ -154,12 +158,38 @@ export const useSocket = ({
       const logKey = device.serial || device.id;
       onConnectionUpdate(logKey, finalState);
 
-      // push into logs
       const log: DeviceLog = {
         id: `${deviceId}-${Date.now()}`,
         deviceId,
         type: "LWT",
         message: raw?.status || JSON.stringify(raw),
+        payload: raw,
+        timestamp: new Date().toISOString(),
+      };
+      onLog(logKey, log);
+    });
+
+    // ------------------------
+    // EVENT: device-availability
+    // ------------------------
+    socket.on("device-availability", (raw: any) => {
+      const deviceId = raw?.deviceId;
+      if (!deviceId) return;
+
+      const device = getDevices().find(
+        (d) => d.serial === deviceId || d.id === deviceId
+      );
+      if (!device) return;
+
+      const available = !!raw?.available;
+      const logKey = device.serial || device.id;
+      onConnectionUpdate(logKey, available ? "online" : "offline");
+
+      const log: DeviceLog = {
+        id: `${deviceId}-${Date.now()}`,
+        deviceId,
+        type: "AVAILABILITY",
+        message: available ? "AVAILABLE" : "UNAVAILABLE",
         payload: raw,
         timestamp: new Date().toISOString(),
       };

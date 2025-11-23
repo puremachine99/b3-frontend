@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { login } from "@/lib/auth"
+import { parseApiError } from "@/utils/device"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -33,8 +34,8 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
       const name = user?.username || user?.name || user?.email || "there"
       toast.success(`Hi ${name}, welcome back!`)
       router.push("/dashboard")
-    } catch (err: any) {
-      setError(err?.message || "Invalid username or password")
+    } catch (err: unknown) {
+      setError(parseApiError(err))
     } finally {
       setLoading(false)
     }

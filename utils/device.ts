@@ -1,5 +1,7 @@
 // src/utils/device.ts
 
+import "@/lib/api-client/config";
+import { ApiError } from "@/lib/api-client";
 import type { Device } from "@/types/device";
 import type { DeviceGroup } from "@/types/group";
 import type { DeviceLog } from "@/types/logs";
@@ -255,11 +257,28 @@ export const mapApiLog = (
 // -------------------------------------
 // API Error Parser
 // -------------------------------------
-export const parseApiError = (error: any): string => {
+export const parseApiError = (error: unknown): string => {
   if (!error) return "Unknown error";
 
-  if (error.response?.data) {
-    const data = error.response.data;
+  if (error instanceof ApiError) {
+    const body = error.body as Record<string, unknown> | undefined;
+    const message = body?.message ?? body?.error;
+    if (Array.isArray(message)) {
+      return message.join(", ");
+    }
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+    return error.message || "Request failed";
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "response" in error &&
+    typeof (error as any).response?.data !== "undefined"
+  ) {
+    const data = (error as any).response?.data;
     const msg = data?.message || data?.error;
     if (Array.isArray(msg)) return msg.join(", ");
     return msg || "Request failed";

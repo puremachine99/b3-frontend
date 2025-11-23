@@ -3,7 +3,13 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 
-import { api } from "@/lib/api";
+import "@/lib/api-client/config";
+import {
+  ApiError,
+  GroupsService,
+  type CreateGroupDto,
+  type UpdateGroupDto,
+} from "@/lib/api-client";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { Badge } from "@/components/ui/badge";
@@ -47,19 +53,9 @@ type Group = {
   createdAt?: string;
 };
 
-type ApiGroup = {
-  id: string;
-  name: string;
-  description?: string;
-  createdAt?: string;
-};
+type ApiGroup = Record<string, any>; // missing from OpenAPI
 
-type NewGroupPayload = {
-  name: string;
-  description?: string;
-};
-
-type UpdateGroupPayload = NewGroupPayload & { id: string };
+type UpdateGroupPayload = UpdateGroupDto & { id: string };
 
 export default function GroupsPage() {
   const router = useRouter();
@@ -78,8 +74,9 @@ export default function GroupsPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await api.get<ApiGroup[]>("/groups");
-      setGroups(res.data ?? []);
+      const res = await GroupsService.groupsControllerFindAll();
+      const raw = Array.isArray(res) ? res : res?.data ?? [];
+      setGroups(raw);
     } catch (err) {
       console.error(err);
       setError(parseApiError(err));
@@ -97,10 +94,10 @@ export default function GroupsPage() {
     loadGroups();
   }, [loadGroups, router]);
 
-  const handleCreate = async (payload: NewGroupPayload) => {
+  const handleCreate = async (payload: CreateGroupDto) => {
     try {
       setSaving(true);
-      await api.post("/groups", payload);
+      await GroupsService.groupsControllerCreate(payload);
       toast({ title: "Group created" });
       setAddOpen(false);
       await loadGroups();
@@ -116,7 +113,11 @@ export default function GroupsPage() {
   const handleUpdate = async (payload: UpdateGroupPayload) => {
     try {
       setSaving(true);
-      await api.patch(`/groups/${payload.id}`, payload);
+      await GroupsService.groupsControllerUpdate(payload.id, {
+        name: payload.name,
+        description: payload.description,
+        metadata: payload.metadata,
+      });
       toast({ title: "Group updated" });
       setEditGroup(null);
       await loadGroups();
@@ -133,7 +134,7 @@ export default function GroupsPage() {
     if (!deleteGroup) return;
     try {
       setDeleting(true);
-      await api.delete(`/groups/${deleteGroup.id}`);
+      await GroupsService.groupsControllerRemove(deleteGroup.id);
       toast({ title: "Group deleted" });
       setDeleteGroup(null);
       setDeleteInput("");
@@ -421,7 +422,7 @@ function AddGroupDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (payload: NewGroupPayload) => Promise<void>;
+  onSubmit: (payload: CreateGroupDto) => Promise<void>;
   loading: boolean;
 }) {
   const [name, setName] = React.useState("");
@@ -637,6 +638,13 @@ function StatTile({
 }
 
 function parseApiError(error: unknown): string {
+  if (error instanceof ApiError) {
+    const body = error.body as Record<string, unknown> | undefined;
+    const message = body?.message || body?.error || error.message;
+    if (Array.isArray(message)) return message.join(", ");
+    if (typeof message === "string") return message;
+    return error.message || "Request failed";
+  }
   if (typeof error === "string") return error;
   if (
     typeof error === "object" &&

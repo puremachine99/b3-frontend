@@ -30,7 +30,7 @@ import { useDevices } from "@/hooks/useDevices";
 import { useDeviceDialogs } from "@/hooks/useDeviceDialogs";
 import { isDeviceDisconnected } from "@/utils/device";
 
-import type { Device, DeviceView } from "@/types/device";
+import type { Device } from "@/types/device";
 import type { DeviceGroup } from "@/types/group";
 
 const SHELL_STYLE: CSSProperties = {
@@ -253,10 +253,7 @@ export default function DevicesPage() {
             {showLoadingCards ? (
               <DeviceLoadingState />
             ) : (
-              <Tabs
-                value={view}
-                onValueChange={(value) => setView(value as DeviceView)}
-              >
+              <Tabs value={view} onValueChange={(v) => setView(v as any)}>
                 <TabsContent value="grid">
                   <DeviceGridView
                     groups={derivedGroups}
@@ -315,6 +312,7 @@ export default function DevicesPage() {
 
       <EditDeviceDialog
         device={editDevice}
+        canEditSerial={editDevice?.status === "offline"}
         onOpenChange={(open) => {
           if (!open) setEditDevice(null);
         }}

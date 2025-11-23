@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import type { CreateDeviceDto } from "@/lib/api-client";
 import type { DeviceGroup } from "@/types/group";
 
 import { parseCoordinateInput } from "@/utils/coords";
@@ -32,15 +33,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 
   groups: DeviceGroup[];
-  onSubmit: (payload: {
-    name: string;
-    serialNumber: string;
-    location?: string;
-    description?: string;
-    latitude?: number | null;
-    longitude?: number | null;
-    groupId?: string;
-  }) => Promise<void>;
+  onSubmit: (payload: (CreateDeviceDto & { groupId?: string })) => Promise<void>;
 }
 
 export const AddDeviceDialog = ({
@@ -75,13 +68,16 @@ export const AddDeviceDialog = ({
     setError(null);
 
     try {
+      const latitudeValue = parseCoordinateInput(latitude);
+      const longitudeValue = parseCoordinateInput(longitude);
+
       await onSubmit({
         name,
         serialNumber,
         location,
         description,
-        latitude: parseCoordinateInput(latitude),
-        longitude: parseCoordinateInput(longitude),
+        latitude: latitudeValue ?? undefined,
+        longitude: longitudeValue ?? undefined,
         groupId,
       });
 

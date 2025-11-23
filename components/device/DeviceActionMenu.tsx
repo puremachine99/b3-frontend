@@ -39,6 +39,10 @@ export const DeviceActionMenu = ({
   onAssign,
   disabledActions = false,
 }: Props) => {
+  const isOffline = device.status === "offline";
+  const disableNonDeleteActions = disabledActions || isOffline;
+  const disableDelete = disabledActions;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -55,7 +59,7 @@ export const DeviceActionMenu = ({
       <DropdownMenuContent align="end" className="w-48">
         {/* EDIT */}
         <DropdownMenuItem
-          disabled={disabledActions}
+          disabled={disableNonDeleteActions}
           onSelect={() => onEdit(device)}
         >
           <IconDeviceFloppy className="size-4" />
@@ -64,7 +68,7 @@ export const DeviceActionMenu = ({
 
         {/* ASSIGN */}
         <DropdownMenuItem
-          disabled={disabledActions}
+          disabled={disableNonDeleteActions}
           onSelect={() => onAssign(device)}
         >
           <IconUsersGroup className="size-4" />
@@ -72,7 +76,10 @@ export const DeviceActionMenu = ({
         </DropdownMenuItem>
 
         {/* VIEW LOGS */}
-        <DropdownMenuItem onSelect={() => onViewLogs(device)}>
+        <DropdownMenuItem
+          disabled={disableNonDeleteActions}
+          onSelect={() => onViewLogs(device)}
+        >
           <IconTerminal2 className="size-4" />
           View Logs
         </DropdownMenuItem>
@@ -81,7 +88,7 @@ export const DeviceActionMenu = ({
 
         {/* DELETE */}
         <DropdownMenuItem
-          disabled={disabledActions}
+          disabled={disableDelete}
           onSelect={() => onDelete(device)}
           className="text-rose-600 focus:text-rose-700"
         >

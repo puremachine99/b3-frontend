@@ -2,7 +2,8 @@
 
 import * as React from "react";
 
-import { api } from "@/lib/api";
+import "@/lib/api-client/config";
+import { ApiError, DevicesService, GroupsService } from "@/lib/api-client";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { Badge } from "@/components/ui/badge";
@@ -36,19 +37,7 @@ type Device = {
   longitude?: number | null;
 };
 
-type ApiDevice = {
-  id?: string;
-  name?: string;
-  serialNumber?: string;
-  macAddress?: string;
-  status?: string | null;
-  location?: string | null;
-  lastSeenAt?: string | null;
-  groupId?: string | null;
-  group?: { id?: string | null } | null;
-  latitude?: number | null;
-  longitude?: number | null;
-};
+type ApiDevice = Record<string, any>; // missing from OpenAPI
 
 type DeviceGroup = {
   id: string;
@@ -57,12 +46,7 @@ type DeviceGroup = {
   devices: number;
 };
 
-type ApiGroup = {
-  id?: string;
-  name?: string;
-  description?: string;
-  devices?: ApiDevice[];
-};
+type ApiGroup = Record<string, any>; // missing from OpenAPI
 
 declare global {
   interface Window {
@@ -85,18 +69,20 @@ export default function Page() {
       setLoading(true);
       setError(null);
       const [deviceRes, groupRes] = await Promise.allSettled([
-        api.get<ApiDevice[]>("/devices"),
-        api.get("/groups"),
+        DevicesService.devicesControllerFindAll(),
+        GroupsService.groupsControllerFindAll(),
       ]);
 
       if (deviceRes.status === "rejected") {
         throw deviceRes.reason;
       }
-      const apiDevices = deviceRes.value.data ?? [];
+      const apiDevices = Array.isArray(deviceRes.value)
+        ? deviceRes.value
+        : deviceRes.value?.data ?? [];
       setDevices(apiDevices.map(mapDevice));
 
       if (groupRes.status === "fulfilled") {
-        const raw = groupRes.value.data;
+        const raw = groupRes.value;
         const apiGroups = Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : [];
         setGroups(apiGroups.map(mapGroup));
       } else {
@@ -412,6 +398,13 @@ function normalizeStatus(status?: string | null): Device["status"] {
 }
 
 function parseApiError(error: unknown): string {
+  if (error instanceof ApiError) {
+    const body = error.body as Record<string, unknown> | undefined;
+    const message = body?.message || body?.error || error.message;
+    if (Array.isArray(message)) return message.join(", ");
+    if (typeof message === "string") return message;
+    return error.message || "Request failed";
+  }
   if (typeof error === "string") return error;
   if (
     typeof error === "object" &&

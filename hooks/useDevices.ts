@@ -3,7 +3,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import "@/lib/api-client/config";
+import {
+  ApiError,
+  DeviceLogsService,
+  DevicesService,
+  GroupsService,
+} from "@/lib/api-client";
 import { useSocket } from "@/hooks/useSocket";
 
 import {
@@ -16,13 +22,19 @@ import {
   mergeAndSortLogs,
 } from "@/utils/device";
 
-import type {
-  Device,
-  NewDevicePayload,
-  UpdateDevicePayload,
-} from "@/types/device";
+import type { CreateDeviceDto, UpdateDeviceDto } from "@/lib/api-client";
+import type { Device } from "@/types/device";
 import type { DeviceGroup } from "@/types/group";
 import type { DeviceLog } from "@/types/logs";
+
+type CreateDeviceInput = CreateDeviceDto & {
+  groupId?: string;
+};
+
+type UpdateDeviceInput = UpdateDeviceDto & {
+  id: string;
+  groupId?: string;
+};
 export const useDevices = () => {
   // ---------------------------
   // STATE
@@ -121,10 +133,10 @@ export const useDevices = () => {
       setLoadingDevices(true);
       setError(null);
 
-      const res = await api.get("/devices");
-      const rawDevices = Array.isArray(res.data)
-        ? res.data
-        : res.data?.data ?? [];
+      const res = await DevicesService.devicesControllerFindAll();
+      const rawDevices = Array.isArray(res)
+        ? res
+        : res?.data ?? [];
 
       const mapped = rawDevices.map(mapApiDeviceToDevice);
       setDevices(mapped);
@@ -160,8 +172,8 @@ export const useDevices = () => {
     try {
       setLoadingGroups(true);
 
-      const res = await api.get("/groups");
-      const raw = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+      const res = await GroupsService.groupsControllerFindAll();
+      const raw = Array.isArray(res) ? res : res?.data ?? [];
 
       setGroups(raw.map(mapApiGroupToGroup));
     } catch (err) {
@@ -182,10 +194,11 @@ export const useDevices = () => {
           const key = dev.serial || dev.id;
           if (!key) return null;
 
-          const res = await api.get(`/device-logs/${key}`);
-          const rawLogs = Array.isArray(res.data)
-            ? res.data
-            : res.data?.data ?? [];
+          const res =
+            await DeviceLogsService.deviceLogsControllerGetDeviceLogs(key);
+          const rawLogs = Array.isArray(res)
+            ? res
+            : res?.data ?? [];
 
           const mappedLogs = rawLogs.map((item: any, idx: number) =>
             mapApiLog(dev, item, idx)
@@ -227,37 +240,46 @@ export const useDevices = () => {
   // CRUD & ACTIONS
   // ---------------------------------
 
-  const createDevice = async (payload: NewDevicePayload) => {
+  const createDevice = async (payload: CreateDeviceInput) => {
     try {
-      await api.post("/devices", {
-        macAddress: payload.serialNumber,
+      const defaultStatus = (payload.status ?? "OFFLINE") as CreateDeviceDto["status"];
+      await DevicesService.devicesControllerCreate({
         serialNumber: payload.serialNumber,
         name: payload.name,
         description: payload.description,
         location: payload.location,
-        status: "OFFLINE",
-        latitude: payload.latitude,
-        longitude: payload.longitude,
+        status: defaultStatus,
+        latitude:
+          typeof payload.latitude === "number" ? payload.latitude : undefined,
+        longitude:
+          typeof payload.longitude === "number" ? payload.longitude : undefined,
       });
       await loadDevices();
     } catch (err) {
+      if (err instanceof ApiError) {
+        throw err;
+      }
       throw new Error(parseApiError(err));
     }
   };
 
-  const updateDevice = async (payload: UpdateDevicePayload) => {
+  const updateDevice = async (payload: UpdateDeviceInput) => {
     try {
-      await api.patch(`/devices/${payload.id}`, {
-        macAddress: payload.serialNumber,
+      await DevicesService.devicesControllerUpdate(payload.id, {
         serialNumber: payload.serialNumber,
         name: payload.name,
         description: payload.description,
         location: payload.location,
-        latitude: payload.latitude,
-        longitude: payload.longitude,
+        latitude:
+          typeof payload.latitude === "number" ? payload.latitude : undefined,
+        longitude:
+          typeof payload.longitude === "number" ? payload.longitude : undefined,
       });
       await loadDevices();
     } catch (err) {
+      if (err instanceof ApiError) {
+        throw err;
+      }
       throw new Error(parseApiError(err));
     }
   };
@@ -265,18 +287,24 @@ export const useDevices = () => {
   const deleteDevice = async (device: Device) => {
     try {
       const id = device.serial || device.id;
-      await api.delete(`/devices/${id}`);
+      await DevicesService.devicesControllerRemove(id);
       await loadDevices();
     } catch (err) {
+      if (err instanceof ApiError) {
+        throw err;
+      }
       throw new Error(parseApiError(err));
     }
   };
 
   const assignDeviceToGroup = async (deviceId: string, groupId: string) => {
     try {
-      await api.post(`/groups/${groupId}/devices/${deviceId}`);
+      await GroupsService.groupsControllerAddDevice(groupId, deviceId);
       await Promise.all([loadDevices(), loadGroups()]);
     } catch (err) {
+      if (err instanceof ApiError) {
+        throw err;
+      }
       throw new Error(parseApiError(err));
     }
   };
@@ -289,12 +317,15 @@ export const useDevices = () => {
     setPowerMap((prev) => ({ ...prev, [device.id]: value }));
 
     try {
-      await api.post(`/devices/${id}/cmd`, {
+      await DevicesService.devicesControllerSendCommand(id, {
         payload: { command, params: { speed: 1 } },
       });
     } catch (err) {
       // revert
       setPowerMap((prev) => ({ ...prev, [device.id]: !value }));
+      if (err instanceof ApiError) {
+        throw err;
+      }
       throw new Error(parseApiError(err));
     }
   };
@@ -308,8 +339,7 @@ export const useDevices = () => {
       const results = await Promise.allSettled(
         deviceList.map(async (dev) => {
           const id = dev.serial || dev.id;
-          const res = await api.get(`/devices/${id}/status`);
-          const data = res.data;
+          const data = await DevicesService.devicesControllerFindStatus(id);
 
           const status = normalizeStatus(data?.status);
           const lastSeen = data?.lastSeenAt

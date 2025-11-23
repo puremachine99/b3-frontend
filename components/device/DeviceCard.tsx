@@ -66,9 +66,12 @@ export const DeviceCard = ({
 
   return (
     <div
+      aria-disabled={!isOnline}
+      data-disabled={!isOnline}
       className={cn(
-        "rounded-xl border p-4 shadow-sm flex flex-col gap-3 bg-card",
-        isOnline ? "border-border" : "border-red-500/50"
+        "rounded-xl border p-4 shadow-sm flex flex-col gap-3 bg-card transition-all",
+        isOnline ? "border-border" : "border-red-500/60 bg-muted/40",
+        !isOnline && "opacity-70"
       )}
     >
       <div className="flex items-start justify-between gap-2">
