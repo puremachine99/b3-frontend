@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "generate:api": "openapi --input http://localhost:8000/docs-json --output lib/api-client"
+    "generate:api": "openapi --input http://127.0.0.1:8000/docs-json --output lib/api-client"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

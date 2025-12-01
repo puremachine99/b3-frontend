@@ -46,7 +46,9 @@ export const useSocket = ({
       process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
     const socket = io(SOCKET_URL, {
-      transports: ["websocket"],
+      // Allow polling fallback agar tetap jalan lewat tunnel/proxy
+      transports: ["websocket", "polling"],
+      path: "/socket.io",
       closeOnBeforeunload: true,
     });
 

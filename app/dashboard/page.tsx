@@ -182,22 +182,25 @@ export default function Page() {
     // Clear existing markers
     markerLayerRef.current.clearLayers();
 
-    const validDevices = filteredDevices.filter(
-      (d) =>
-        typeof d.latitude === "number" &&
-        !Number.isNaN(d.latitude) &&
-        typeof d.longitude === "number" &&
-        !Number.isNaN(d.longitude)
-    );
+    // Ambil device yang punya koordinat valid (coerce ke number karena API bisa kirim string)
+    const coords = filteredDevices
+      .map((d) => {
+        const lat = Number(d.latitude);
+        const lng = Number(d.longitude);
+        return Number.isFinite(lat) && Number.isFinite(lng)
+          ? { device: d, lat, lng }
+          : null;
+      })
+      .filter((v): v is { device: typeof filteredDevices[number]; lat: number; lng: number } => !!v);
 
     // If no device has valid coordinates, stop here – prevent crashes
-    if (validDevices.length === 0) {
+    if (coords.length === 0) {
       return; // <── FIX: Avoid Leaflet “Bounds are not valid”
     }
 
     // Add markers
-    validDevices.forEach((device) => {
-      const marker = L.marker([device.latitude!, device.longitude!], {
+    coords.forEach(({ device, lat, lng }) => {
+      const marker = L.marker([lat, lng], {
         title: device.name,
       });
 
@@ -215,12 +218,17 @@ export default function Page() {
     });
 
     // Fit bounds only when valid markers exist
-    const bounds = L.latLngBounds(
-      validDevices.map((d) => [d.latitude!, d.longitude!])
-    );
+    const bounds = L.latLngBounds(coords.map((c) => [c.lat, c.lng]));
 
-    if (bounds.isValid()) {
+    if (!bounds.isValid()) {
+      return;
+    }
+
+    // Leaflet kadang melempar error jika bounds tidak cocok dengan ukuran map (mis. map belum siap)
+    try {
       mapRef.current.fitBounds(bounds.pad(0.2));
+    } catch (err) {
+      console.warn("fitBounds failed, skip to avoid crash", err);
     }
   }, [filteredDevices, leafletReady]);
 
