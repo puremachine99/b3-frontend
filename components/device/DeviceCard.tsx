@@ -65,14 +65,17 @@ export const DeviceCard = ({
       ? `${device.latitude}, ${device.longitude}`
       : null;
 
+  const disabled = !isOnline;
+
   return (
     <div
-      aria-disabled={!isOnline}
-      data-disabled={!isOnline}
+      aria-disabled={disabled}
+      data-disabled={disabled}
+      tabIndex={disabled ? -1 : undefined}
       className={cn(
-        "rounded-xl border p-4 shadow-sm flex flex-col gap-3 bg-card transition-all",
+        "relative rounded-xl border p-4 shadow-sm flex flex-col gap-3 bg-card transition-all",
         isOnline ? "border-border" : "border-red-500/60 bg-muted/40",
-        !isOnline && "opacity-70"
+        disabled && "opacity-70 pointer-events-none"
       )}
     >
       <div className="flex items-start justify-between gap-2">
@@ -111,15 +114,29 @@ export const DeviceCard = ({
 
         <Switch
           checked={isPowerOn}
-          onCheckedChange={(val) => onTogglePower(device, val)}
-          disabled={!isOnline}
+          onCheckedChange={(val) => {
+            if (disabled) return;
+            onTogglePower(device, val);
+          }}
+          disabled={disabled}
         />
       </div>
 
-      <Button className="w-full" onClick={() => onOpenLogs(device)}>
+      <Button
+        className="w-full"
+        onClick={() => {
+          if (disabled) return;
+          onOpenLogs(device);
+        }}
+        disabled={disabled}
+      >
         <IconTerminal2 className="size-4" />
         View Logs
       </Button>
+
+      {disabled ? (
+        <div className="absolute inset-0 rounded-xl border border-transparent" aria-hidden="true" />
+      ) : null}
     </div>
   );
 };

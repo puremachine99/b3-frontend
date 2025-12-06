@@ -74,8 +74,13 @@ type User = {
   createdAt?: string;
 };
 
-type NewUserPayload = CreateUserDto;
-type UpdateUserPayload = UpdateUserDto & { id: string };
+type UserFormPayload = {
+  username: string;
+  email: string;
+  password?: string;
+  role?: CreateUserDto["role"];
+};
+type UpdateUserPayload = UpdateUserDto & UserFormPayload & { id: string };
 
 /* ============================================================
    MAIN PAGE
@@ -87,8 +92,8 @@ export default function UsersPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  const [addOpen, setAddOpen] = React.useState(false);
-  const [editUser, setEditUser] = React.useState<User | null>(null);
+  const [formOpen, setFormOpen] = React.useState(false);
+  const [editingUser, setEditingUser] = React.useState<User | null>(null);
   const [deleteUser, setDeleteUser] = React.useState<User | null>(null);
   const [deleteInput, setDeleteInput] = React.useState("");
 
@@ -127,19 +132,19 @@ export default function UsersPage() {
   /* ============================================================
      CREATE USER
   ============================================================ */
-  const handleCreate = async (payload: CreateUserDto) => {
+  const handleCreate = async (payload: UserFormPayload) => {
     try {
       setSaving(true);
 
       await UsersService.usersControllerCreate({
         username: payload.username,
         email: payload.email,
-        password: payload.password,
+        password: payload.password ?? "",
         role: payload.role as CreateUserDto["role"],
       });
 
       toast("User created");
-      setAddOpen(false);
+      setFormOpen(false);
       await loadUsers();
     } catch (err) {
       toast.error("Failed to create user", {
@@ -165,7 +170,8 @@ export default function UsersPage() {
       });
 
       toast("User updated");
-      setEditUser(null);
+      setEditingUser(null);
+      setFormOpen(false);
       await loadUsers();
     } catch (err) {
       toast.error("Failed to update user", {
@@ -234,7 +240,12 @@ export default function UsersPage() {
               </div>
 
               <div className="flex gap-2">
-                <Button onClick={() => setAddOpen(true)}>
+                <Button
+                  onClick={() => {
+                    setEditingUser(null);
+                    setFormOpen(true);
+                  }}
+                >
                   <IconUserPlus className="size-4" />
                   Add User
                 </Button>
@@ -258,7 +269,10 @@ export default function UsersPage() {
             {/* === TABLE VIEW === */}
             <UserTable
               users={users}
-              onEdit={setEditUser}
+              onEdit={(u) => {
+                setEditingUser(u);
+                setFormOpen(true);
+              }}
               onDelete={(u) => {
                 setDeleteUser(u);
                 setDeleteInput("");
@@ -269,19 +283,22 @@ export default function UsersPage() {
       </SidebarInset>
 
       {/* DIALOGS */}
-      <AddUserDialog
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        onSubmit={handleCreate}
-        loading={saving}
-      />
-
-      <EditUserDialog
-        user={editUser}
+      <UserDialog
+        open={formOpen}
+        user={editingUser}
         onOpenChange={(open) => {
-          if (!open) setEditUser(null);
+          if (!open) {
+            setEditingUser(null);
+          }
+          setFormOpen(open);
         }}
-        onSubmit={handleUpdate}
+        onSubmit={(payload) => {
+          if (editingUser) {
+            return handleUpdate({ id: editingUser.id, ...payload });
+          }
+          return handleCreate(payload);
+        }}
+        mode={editingUser ? "edit" : "create"}
         loading={saving}
       />
 
@@ -387,24 +404,36 @@ function UserTable({
 }
 
 /* ============================================================
-   ADD USER DIALOG
+   USER DIALOG (CREATE + EDIT)
 ============================================================ */
-function AddUserDialog({
+function UserDialog({
   open,
+  user,
   onOpenChange,
   onSubmit,
+  mode,
   loading,
 }: {
   open: boolean;
+  user: User | null;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (payload: NewUserPayload) => Promise<void>;
+  onSubmit: (payload: UserFormPayload) => Promise<void>;
+  mode: "create" | "edit";
   loading: boolean;
 }) {
-  const [username, setUsername] = React.useState("");
-  const [email, setEmail] = React.useState("");
+  const [username, setUsername] = React.useState(user?.username ?? "");
+  const [email, setEmail] = React.useState(user?.email ?? "");
   const [password, setPassword] = React.useState("");
-  const [role, setRole] = React.useState("OPERATOR");
+  const [role, setRole] = React.useState(user?.role ?? "OPERATOR");
   const [localError, setLocalError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setUsername(user?.username ?? "");
+    setEmail(user?.email ?? "");
+    setPassword("");
+    setRole(user?.role ?? "OPERATOR");
+    setLocalError(null);
+  }, [user]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -415,14 +444,16 @@ function AddUserDialog({
       await onSubmit({
         username,
         email,
-        password,
+        password: password || undefined,
         role: role as CreateUserDto["role"],
       });
 
-      setUsername("");
-      setEmail("");
-      setPassword("");
-      setRole("OPERATOR");
+      if (mode === "create") {
+        setUsername("");
+        setEmail("");
+        setPassword("");
+        setRole("OPERATOR");
+      }
 
       onOpenChange(false);
     } catch (err) {
@@ -430,12 +461,17 @@ function AddUserDialog({
     }
   };
 
+  const passwordLabel =
+    mode === "create" ? "Password" : "Password (optional)";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add User</DialogTitle>
-          <DialogDescription>POST /users</DialogDescription>
+          <DialogTitle>{mode === "create" ? "Add User" : "Edit User"}</DialogTitle>
+          <DialogDescription>
+            {mode === "create" ? "POST /users" : `PATCH /users/${user?.id ?? ""}`}
+          </DialogDescription>
         </DialogHeader>
 
         <form className="space-y-3" onSubmit={handleSubmit}>
@@ -459,12 +495,15 @@ function AddUserDialog({
           </div>
 
           <div className="space-y-1">
-            <Label>Password</Label>
+            <Label>{passwordLabel}</Label>
             <Input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required
+              placeholder={
+                mode === "create" ? "" : "Leave empty to keep old password"
+              }
+              required={mode === "create"}
             />
           </div>
 
@@ -488,110 +527,7 @@ function AddUserDialog({
             </DialogClose>
 
             <Button type="submit" disabled={loading}>
-              {loading ? "Saving..." : "Save"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-/* ============================================================
-   EDIT USER DIALOG
-============================================================ */
-function EditUserDialog({
-  user,
-  onOpenChange,
-  onSubmit,
-  loading,
-}: {
-  user: User | null;
-  onOpenChange: (open: boolean) => void;
-  onSubmit: (payload: UpdateUserPayload) => Promise<void>;
-  loading: boolean;
-}) {
-  const [email, setEmail] = React.useState(user?.email ?? "");
-  const [password, setPassword] = React.useState("");
-  const [role, setRole] = React.useState(user?.role ?? "OPERATOR");
-  const [localError, setLocalError] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    setEmail(user?.email ?? "");
-    setPassword("");
-    setRole(user?.role ?? "OPERATOR");
-    setLocalError(null);
-  }, [user]);
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!user) return;
-
-    try {
-      setLocalError(null);
-
-      await onSubmit({
-        id: user.id,
-        email,
-        password: password || undefined,
-        role: role as UpdateUserDto["role"],
-      });
-
-      onOpenChange(false);
-    } catch (err) {
-      setLocalError(parseApiError(err));
-    }
-  };
-
-  return (
-    <Dialog open={!!user} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Edit User</DialogTitle>
-          <DialogDescription>PATCH /users/{user?.id ?? ""}</DialogDescription>
-        </DialogHeader>
-
-        <form className="space-y-3" onSubmit={handleSubmit}>
-          <div className="space-y-1">
-            <Label>Email</Label>
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="space-y-1">
-            <Label>Password (optional)</Label>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Leave empty to keep old password"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <Label>Role</Label>
-            <Input
-              value={role}
-              onChange={(e) => setRole(e.target.value.toUpperCase())}
-              required
-            />
-          </div>
-
-          {localError ? (
-            <p className="text-sm text-destructive">{localError}</p>
-          ) : null}
-
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
-            </DialogClose>
-
-            <Button type="submit" disabled={loading}>
-              {loading ? "Saving..." : "Save changes"}
+              {loading ? "Saving..." : mode === "create" ? "Save" : "Save changes"}
             </Button>
           </DialogFooter>
         </form>

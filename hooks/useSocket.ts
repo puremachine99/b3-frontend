@@ -31,10 +31,14 @@ export const useSocket = ({
   const joinDeviceRooms = (socket: Socket) => {
     const devices = getDevices();
     devices.forEach((d) => {
-      const key = d.serial || d.serialNumber;
-      if (key) {
+      const keys = Array.from(
+        new Set([d.serial, d.serialNumber, d.id].filter(Boolean))
+      ) as string[];
+
+      keys.forEach((key) => {
+        console.log("[socket] join-device", { key, device: d.id });
         socket.emit("join-device", { deviceId: key });
-      }
+      });
     });
   };
 
@@ -44,12 +48,17 @@ export const useSocket = ({
   useEffect(() => {
     const SOCKET_URL =
       process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+    const token =
+      typeof window !== "undefined"
+        ? localStorage.getItem("token") || undefined
+        : undefined;
 
     const socket = io(SOCKET_URL, {
       // Allow polling fallback agar tetap jalan lewat tunnel/proxy
       transports: ["websocket", "polling"],
       path: "/socket.io",
       closeOnBeforeunload: true,
+      auth: token ? { token } : undefined,
     });
 
     socketRef.current = socket;
@@ -58,6 +67,7 @@ export const useSocket = ({
     // CONNECTED
     // ------------------------
     socket.on("connect", () => {
+      console.log("[socket] connected", socket.id);
       joinDeviceRooms(socket);
     });
 
@@ -69,10 +79,11 @@ export const useSocket = ({
 
       if (!deviceId) return;
 
+      console.log("[socket] device-log", deviceId, raw);
+
       const device = getDevices().find(
         (d) => d.id === deviceId || d.serial === deviceId
       );
-      if (!device) return;
 
       const mapped: DeviceLog = {
         id: `${deviceId}-${Date.now()}`,
@@ -84,12 +95,24 @@ export const useSocket = ({
       };
 
       // push into logs
-      const logKey = device.serial || device.id;
+      const logKey = device?.serial || device?.id || deviceId;
       onLog(logKey, mapped);
 
       // sync power if log contains relay state
-      const relay = extractRelayState(raw?.payload);
-      if (relay) onPowerUpdate(device.id, relay === "ON");
+      const relay = extractRelayState(raw?.payload ?? raw);
+      if (relay && device) onPowerUpdate(device.id, relay === "ON");
+
+      // update connection when LWT log arrives (payload is plain status string)
+      if ((mapped.type || "").toUpperCase() === "LWT") {
+        const conn = extractConnectionState(raw);
+        if (conn) {
+            onConnectionUpdate(
+              logKey,
+              conn === "ONLINE" ? "online" : "offline"
+            );
+          console.log("[socket] LWT log connection", logKey, conn);
+        }
+      }
     });
 
     // ------------------------
@@ -99,14 +122,19 @@ export const useSocket = ({
       const deviceId = raw?.deviceId || raw?.macAddress || raw?.serialNumber;
       if (!deviceId) return;
 
+      console.log("[socket] device-status", deviceId, raw);
+
       const device = getDevices().find(
         (d) => d.serial === deviceId || d.id === deviceId
       );
-      if (!device) return;
 
-      const statusStr = raw?.status;
-      const normalized = statusStr ? statusStr.toLowerCase() : "";
-      const logKey = device.serial || device.id;
+      const statusStr =
+        raw?.status ||
+        raw?.payload?.status ||
+        raw?.payload?.connection ||
+        raw?.payload?.device_connection;
+      const normalized = statusStr ? String(statusStr).toLowerCase() : "";
+      const logKey = device?.serial || device?.id || deviceId;
 
       const indicatesConnection =
         normalized === "online" ||
@@ -122,16 +150,27 @@ export const useSocket = ({
         onConnectionUpdate(logKey, nextState);
       }
 
-      if (normalized === "on" || normalized === "off") {
-        onPowerUpdate(device.id, normalized === "on");
+      // Update power from status payload
+      const relay =
+        raw?.payload?.relay ??
+        raw?.payload?.relay_state ??
+        raw?.payload?.relayState;
+      if (device && (normalized === "on" || normalized === "off" || relay)) {
+        const nextPower =
+          normalized === "on"
+            ? true
+            : normalized === "off"
+            ? false
+            : relay === "ON" || relay === "on";
+        onPowerUpdate(device.id, nextPower);
       }
 
       const log: DeviceLog = {
         id: `${deviceId}-${Date.now()}`,
         deviceId,
         type: "STATUS",
-        message: statusStr || JSON.stringify(raw),
-        payload: raw?.payload,
+        message: statusStr || JSON.stringify(raw?.payload ?? raw),
+        payload: raw?.payload ?? raw,
         timestamp: new Date().toISOString(),
       };
       onLog(logKey, log);
@@ -147,16 +186,16 @@ export const useSocket = ({
       const device = getDevices().find(
         (d) => d.serial === deviceId || d.id === deviceId
       );
-      if (!device) return;
 
       const conn = extractConnectionState({
-        message: raw?.status,
+        message: raw?.status || raw?.payload?.status,
         payload: raw,
       });
 
       const finalState = conn === "ONLINE" ? "online" : "offline";
-      const logKey = device.serial || device.id;
+      const logKey = device?.serial || device?.id || deviceId;
       onConnectionUpdate(logKey, finalState);
+      console.log("[socket] device-connection", logKey, finalState, raw);
 
       const log: DeviceLog = {
         id: `${deviceId}-${Date.now()}`,
@@ -176,13 +215,14 @@ export const useSocket = ({
       const deviceId = raw?.deviceId;
       if (!deviceId) return;
 
+      console.log("[socket] device-availability", deviceId, raw);
+
       const device = getDevices().find(
         (d) => d.serial === deviceId || d.id === deviceId
       );
-      if (!device) return;
 
       const available = !!raw?.available;
-      const logKey = device.serial || device.id;
+      const logKey = device?.serial || device?.id || deviceId;
       onConnectionUpdate(logKey, available ? "online" : "offline");
 
       const log: DeviceLog = {
@@ -204,4 +244,12 @@ export const useSocket = ({
       socketRef.current = null;
     };
   }, [getDevices, onLog, onConnectionUpdate, onPowerUpdate]);
+
+  // Re-join rooms whenever device list changes after initial load
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (socket?.connected) {
+      joinDeviceRooms(socket);
+    }
+  }, [getDevices]);
 };

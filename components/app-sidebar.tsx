@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { usePathname } from "next/navigation";
+import Image from "next/image";
 import type { Icon } from "@tabler/icons-react";
 import {
   IconInnerShadowTop,
@@ -10,6 +11,7 @@ import {
   IconUsers,
   IconUsersGroup,
 } from "@tabler/icons-react";
+import logo from "@/public/logo.png";
 
 import { NavUser } from "@/components/nav-user";
 import {
@@ -133,9 +135,14 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
               asChild
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
-              <a href="#">
-                <IconInnerShadowTop className="!size-5" />
-                <span className="text-base font-semibold">Novarelix</span>
+              <a href="/dashboard" className="gap-2">
+                
+                <Image
+                  src={logo}
+                  alt="B3Sahabat"
+                  className="h-8 w-auto"
+                  priority
+                />
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>

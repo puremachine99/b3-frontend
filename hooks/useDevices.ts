@@ -320,8 +320,9 @@ export const useDevices = () => {
     setPowerMap((prev) => ({ ...prev, [device.id]: value }));
 
     try {
+      // Send plain text command to MQTT (no extra JSON wrapper)
       await DevicesService.devicesControllerSendCommand(id, {
-        payload: { command, params: { speed: 1 } },
+        payload: command,
       });
     } catch (err) {
       // revert

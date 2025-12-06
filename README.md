@@ -1,4 +1,4 @@
-# Frontend B3 Sahabat IoT
+# Frontend B3Sahabat IoT
 
 Proyek ini adalah dashboard web untuk memantau dan mengelola perangkat IoT. Fokusnya: lihat status perangkat secara realtime, kirim perintah, dan cek log aktivitas lewat antarmuka yang simpel.
 

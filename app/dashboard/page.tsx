@@ -345,7 +345,10 @@ export default function Page() {
                   <p className="text-sm text-muted-foreground">No Group yet.</p>
                 ) : (
                   groups.map((group) => (
-                    <div key={group.id} className="rounded-lg border p-3">
+                    <div
+                      key={group.id}
+                      className="rounded-lg border border-border bg-card p-3"
+                    >
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0">
                           <p className="font-medium truncate">{group.name}</p>
@@ -381,7 +384,7 @@ function StatBox({
   loading: boolean;
 }) {
   return (
-    <div className="rounded-lg border p-3">
+    <div className="rounded-lg border border-border bg-card p-3">
       <p className="text-sm text-muted-foreground">{label}</p>
       <p className="text-3xl font-semibold tabular-nums">
         {loading ? "…" : value}
@@ -412,7 +415,7 @@ function DeviceTable({
   }
 
   return (
-    <div className="rounded-lg border">
+    <div className="rounded-lg border border-border bg-card">
       <Table>
         <TableHeader>
           <TableRow>
